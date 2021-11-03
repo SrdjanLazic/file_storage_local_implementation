@@ -7,28 +7,24 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Scanner;
 
 public class LocalFileStorageImplementation implements FileStorage {
 
     private String downloadFolder = "/Download";
     // TODO: treba dodati polje koje drzi root direktorijum skladista, i onda sve putanje promeniti tako da su relativne u odnosu na root
-    private String currentDirectory = "D:";
     private List<User> users;
+    private List<StorageModel> storageModelList = new ArrayList<>();
     private StorageModel currentStorage;
 
     private List<File> getFileList() {
-        File directory = new File(currentDirectory);
+        File directory = new File(currentStorage.getRootDirectory());
         File[] fileList = directory.listFiles();
         return Arrays.asList(fileList);
     }
-
-    public LocalFileStorageImplementation(StorageModel storageModel){
-        this.currentStorage = storageModel;
-    }
-
-    // TODO: addUser metoda sa username, password i privileges
 
     @Override
     public void createFolder(String path, String folderName) {
@@ -44,7 +40,6 @@ public class LocalFileStorageImplementation implements FileStorage {
 
             for (int i = firstNum; i <= secondNum; i++) {
                 File folder = new File(getCurrentStorage().getRootDirectory() + "/" + path + "/" + filenameBase + i);
-                System.out.println(folder.getPath());
                 folder.mkdir();
             }
         }
@@ -63,9 +58,11 @@ public class LocalFileStorageImplementation implements FileStorage {
             return;
         }
 
-        File newFile = new File(currentStorage.getRootDirectory() + path + "/" + filename);
-        System.out.println(newFile.getPath());
+        //File newFile = new File(currentStorage.getRootDirectory() + path + "/" + filename);
+        //System.out.println(newFile.getPath());
         try {
+            Files.createDirectories(Paths.get(currentStorage.getRootDirectory() + path));
+            File newFile = new File(currentStorage.getRootDirectory() + path + "/" + filename);
             newFile.createNewFile();
             currentStorage.incrementCounter();
         } catch (IOException e) {
@@ -215,7 +212,60 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void get(String path) {
-        move(path, downloadFolder);
+        move(currentStorage.getRootDirectory() + path, currentStorage.getDownloadFolder());
+    }
+
+    @Override
+    public void initializeStorage(String path) {
+        Boolean isStorage = false;
+        Scanner scanner = new Scanner(System.in);
+        File file = new File(path);
+        File[] filesInRoot = file.listFiles();
+
+        if(filesInRoot != null) {
+            for (File f : filesInRoot) {
+                if (f.getName().contains("users.json") || f.getName().contains("config.json")) {
+                    isStorage = true;
+                }
+            }
+        }
+
+        if(isStorage){
+            System.out.println("Direktorijum je vec skladiste. Unesite username i password kako biste se konektovali na skladiste.");
+            System.out.println("Username:");
+            String username = scanner.nextLine();
+            System.out.println("Password:");
+            String password = scanner.nextLine();
+
+            User user = new User(username, password);
+
+            // TODO: logovanje postojeceg usera u skladiste
+
+
+            //this.currentStorage.checkUser(username, password);
+//            User user = new User(username, password);
+//            StorageModel storageModel = new StorageModel(user, path);
+//            this.setCurrentStorage(storageModel);
+        } else {
+            System.out.println("Direktorijum nije skladiste. Da li zelite da kreirate novo skladiste? Unesite DA ili NE");
+            String choice = scanner.nextLine();
+
+            if(choice.equalsIgnoreCase("DA")){
+                System.out.println("Unesite username i password kako biste kreirali skladiste.");
+                System.out.println("Username:");
+                String username = scanner.nextLine();
+                System.out.println("Password:");
+                String password = scanner.nextLine();
+
+                User user = new User(username, password);
+                StorageModel storageModel = new StorageModel(user, path);
+                this.storageModelList.add(storageModel);
+                setCurrentStorage(storageModel);
+            } else {
+                return;
+            }
+
+        }
     }
 
     public boolean checkExtensions(String filename){
@@ -235,5 +285,9 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     public StorageModel getCurrentStorage() {
         return currentStorage;
+    }
+
+    public String getDownloadFolder() {
+        return downloadFolder;
     }
 }
