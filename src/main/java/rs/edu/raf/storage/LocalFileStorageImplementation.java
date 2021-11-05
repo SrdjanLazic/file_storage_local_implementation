@@ -1,5 +1,7 @@
 package rs.edu.raf.storage;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -7,28 +9,21 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
 public class LocalFileStorageImplementation implements FileStorage {
 
-    private String downloadFolder = "/Download";
-    // TODO: treba dodati polje koje drzi root direktorijum skladista, i onda sve putanje promeniti tako da su relativne u odnosu na root
-    private List<User> users;
+    static {
+        StorageManager.registerStorage(new LocalFileStorageImplementation());
+    }
+
     private List<StorageModel> storageModelList = new ArrayList<>();
     private StorageModel currentStorage;
-
-    private List<File> getFileList() {
-        File directory = new File(currentStorage.getRootDirectory());
-        File[] fileList = directory.listFiles();
-        return Arrays.asList(fileList);
-    }
 
     @Override
     public void createFolder(String path, String folderName) {
 
+        // Kreiranje pomocu {} patterna:
         if(folderName.contains("{") && folderName.contains("}")) {
             String filenameBase;
             int firstBrace = folderName.indexOf("{"), firstNum, secondNum;
@@ -53,13 +48,15 @@ public class LocalFileStorageImplementation implements FileStorage {
     @Override
     public void createFile(String path, String filename) {
 
+        // Provera da li prosledjeni fajl ima ekstenziju koja nije dozvoljena:
         if(checkExtensions(filename)){
             System.out.println("Greska! Nije moguce cuvati fajl u ovoj ekstenziji.");
             return;
         }
 
-        //File newFile = new File(currentStorage.getRootDirectory() + path + "/" + filename);
-        //System.out.println(newFile.getPath());
+        // Kreiranje fajla u datom pathu
+        // Metoda Files.createDirectories() kraira sve potrebne nadfoldere ako ne postoje
+        // Npr. ako je prosledjeno /folder/folder1/folder2, napravice sva tri foldera ako ne postoje, a onda ce smestiti fajl u folder2
         try {
             Files.createDirectories(Paths.get(currentStorage.getRootDirectory() + path));
             File newFile = new File(currentStorage.getRootDirectory() + path + "/" + filename);
@@ -74,12 +71,12 @@ public class LocalFileStorageImplementation implements FileStorage {
     public void createFolder(String folderName) {
         File newFolder = new File(getCurrentStorage().getRootDirectory() + "/" + folderName);
         newFolder.mkdir();
-        currentStorage.incrementCounter();
     }
 
     @Override
     public void createFile(String filename) {
 
+        // Provera da li je dozvoljena ekstenzija fajla
         if(checkExtensions(filename)){
             System.out.println("Greska! Nije moguce cuvati fajl u ovoj ekstenziji.");
             return;
@@ -88,7 +85,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         File newFile = new File(currentStorage.getRootDirectory() + "/" + filename);
         try {
             newFile.createNewFile();
-            currentStorage.incrementCounter();
+            currentStorage.incrementCounter(); // inkrementiranje counter-a za broj fajlova
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -96,6 +93,13 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void delete(String path) {
+
+        // Provera da li trenutni korisnik skladista ima privilegiju za brisanje fajlova
+        if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.DELETE)){
+            System.out.println("\nNemoguce obrisati fajl - trenutni korisnik skladista nema privilegije za brisanje fajlova.");
+            return;
+        }
+
         File file = new File(path);
 
         if(!file.exists()) {
@@ -217,11 +221,13 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void initializeStorage(String path) {
-        Boolean isStorage = false;
+
+        boolean isStorage = false;
         Scanner scanner = new Scanner(System.in);
         File file = new File(path);
         File[] filesInRoot = file.listFiles();
 
+        // Provera da li je prosledjena putanja vec skladiste:
         if(filesInRoot != null) {
             for (File f : filesInRoot) {
                 if (f.getName().contains("users.json") || f.getName().contains("config.json")) {
@@ -230,6 +236,7 @@ public class LocalFileStorageImplementation implements FileStorage {
             }
         }
 
+        // Ako jeste skladiste, procitaj user i config fajlove
         if(isStorage){
             System.out.println("Direktorijum je vec skladiste. Unesite username i password kako biste se konektovali na skladiste.");
             System.out.println("Username:");
@@ -237,15 +244,29 @@ public class LocalFileStorageImplementation implements FileStorage {
             System.out.println("Password:");
             String password = scanner.nextLine();
 
-            User user = new User(username, password);
+            ObjectMapper objectMapper = new ObjectMapper();
+            User user = null;
+            try {
+                user = objectMapper.readValue(new File(path + "/users.json"), User.class);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
 
-            // TODO: logovanje postojeceg usera u skladiste
-
-
-            //this.currentStorage.checkUser(username, password);
-//            User user = new User(username, password);
-//            StorageModel storageModel = new StorageModel(user, path);
-//            this.setCurrentStorage(storageModel);
+            // Provera kredencijala - uporedjivanje prosledjenih username i password-a i procitanih iz users.json fajla
+            if(username.equalsIgnoreCase(user.getUsername()) && password.equalsIgnoreCase(user.getPassword())){
+                try {
+                    // Ako se podaci User-a match-uju, procitaj config, setuj trenutni storage i dodaj skladiste u listu skladista
+                    StorageModel storageModel = objectMapper.readValue(new File(path + "/config.json"), StorageModel.class);
+                    this.storageModelList.add(storageModel);
+                    setCurrentStorage(storageModel);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                System.out.println("Neispravan username ili password!");
+                return;
+            }
+            // Pravimo novo skladiste, prilikom kreiranja User-u koji ga je kreirao dodeljujemo sve privilegije
         } else {
             System.out.println("Direktorijum nije skladiste. Da li zelite da kreirate novo skladiste? Unesite DA ili NE");
             String choice = scanner.nextLine();
@@ -258,16 +279,34 @@ public class LocalFileStorageImplementation implements FileStorage {
                 String password = scanner.nextLine();
 
                 User user = new User(username, password);
+                user.setPrivileges(Set.of(Privileges.values()));
                 StorageModel storageModel = new StorageModel(user, path);
                 this.storageModelList.add(storageModel);
                 setCurrentStorage(storageModel);
             } else {
+                System.out.println("Skladiste nije kreirano.");
                 return;
             }
 
         }
     }
 
+    @Override
+    public void limitNumberOfFiles(int i, String s) {
+
+    }
+
+    @Override
+    public void limitStorageSize(long l) {
+
+    }
+
+    @Override
+    public void restrictExtension(String s) {
+
+    }
+
+    // Pomocna metoda za proveravanje ekstenzije prilikom dodavanja fajla u skladiste
     public boolean checkExtensions(String filename){
         boolean found = false;
         for(String extension: currentStorage.getUnsupportedExtensions()){
@@ -279,6 +318,13 @@ public class LocalFileStorageImplementation implements FileStorage {
         return found;
     }
 
+    // Listanje fajlova u root direktorijumu:
+    private List<File> getFileList() {
+        File directory = new File(currentStorage.getRootDirectory());
+        File[] fileList = directory.listFiles();
+        return Arrays.asList(fileList);
+    }
+
     public void setCurrentStorage(StorageModel currentStorage) {
         this.currentStorage = currentStorage;
     }
@@ -287,7 +333,4 @@ public class LocalFileStorageImplementation implements FileStorage {
         return currentStorage;
     }
 
-    public String getDownloadFolder() {
-        return downloadFolder;
-    }
 }

@@ -1,19 +1,19 @@
 package rs.edu.raf.storage;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import netscape.javascript.JSObject;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class StorageModel {
 
     private File usersJSON;
     private File configJSON;
-    private List<FolderModel> folders;
-    private List<FileModel> files;
+    private File storageFolder;
     private String downloadFolder;
     private String rootDirectory;
     private User superuser;
@@ -21,13 +21,9 @@ public class StorageModel {
     private long storageSize;
     private int maxNumberOfFiles;
     private int currNumberOfFiles;
-    private List<User> userList;
-    private List<String> unsupportedExtensions;
-    private File storageFolder;
-
-    public StorageModel(){
-
-    }
+    private List<User> userList = new ArrayList<>();
+    private List<String> unsupportedExtensions = new ArrayList<>();
+    private Map<File, Integer> maxNumberOfFilesInDirectory = new HashMap<>();
 
     public StorageModel(User user, String path) {
 
@@ -38,11 +34,10 @@ public class StorageModel {
 
         // Inicijalizacija parametara:
         this.storageFolder = storageFolder;
-        this.unsupportedExtensions = new ArrayList<>();
         this.currNumberOfFiles = 0;
         this.rootDirectory = path;
         this.superuser = user;
-        this.userList = new ArrayList<>();
+        this.currentUser = user;
         this.userList.add(user);
 
         // Kreiranje download foldera:
@@ -53,13 +48,13 @@ public class StorageModel {
         }
 
         // Dodavanje config.json i users.json fajlova u root:
-        File usersJSON = new File(rootDirectory + "/users.json"); // TODO: kako da append-ujemo vise usera? Uvek mi overwrite-uje
-        File configJSON = new File(rootDirectory + "/config.json");
+        this.usersJSON = new File(rootDirectory + "/users.json"); // TODO: kako da append-ujemo vise usera? Uvek mi overwrite-uje
+        this.configJSON = new File(rootDirectory + "/config.json");
         ObjectMapper mapper = new ObjectMapper();
         try {
             mapper.writeValue(usersJSON, user);
             mapper.writeValue(configJSON, this);
-            currNumberOfFiles += 2;
+            currNumberOfFiles += 2; // inkrementiramo trenutni broj fajlova u skladistu
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -91,6 +86,14 @@ public class StorageModel {
 
     public void setUnsupportedExtensions(List<String> unsupportedExtensions) {
         this.unsupportedExtensions = unsupportedExtensions;
+    }
+
+    public Map<File, Integer> getMaxNumberOfFilesInDirectory() {
+        return maxNumberOfFilesInDirectory;
+    }
+
+    public void setMaxNumberOfFilesInDirectory(Map<File, Integer> maxNumberOfFilesInDirectory) {
+        this.maxNumberOfFilesInDirectory = maxNumberOfFilesInDirectory;
     }
 
     public List<User> getUserList() {
