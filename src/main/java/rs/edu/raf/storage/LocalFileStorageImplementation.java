@@ -17,12 +17,14 @@ public class LocalFileStorageImplementation implements FileStorage {
         StorageManager.registerStorage(new LocalFileStorageImplementation());
     }
 
+    // TODO: Exceptioni svuda za greske!
+
     private List<StorageModel> storageModelList = new ArrayList<>();
     private StorageModel currentStorage;
 
     @Override
     public void createFolder(String path, String folderName) {
-
+        // TODO: provera privilegija
         // Kreiranje pomocu {} patterna:
         if(folderName.contains("{") && folderName.contains("}")) {
             String filenameBase;
@@ -47,7 +49,7 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void createFile(String path, String filename) {
-
+        // TODO: provera privilegija
         // Provera da li prosledjeni fajl ima ekstenziju koja nije dozvoljena:
         if(checkExtensions(filename)){
             System.out.println("Greska! Nije moguce cuvati fajl u ovoj ekstenziji.");
@@ -69,19 +71,22 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void createFolder(String folderName) {
+        // TODO: provera privilegija
         File newFolder = new File(getCurrentStorage().getRootDirectory() + "/" + folderName);
         newFolder.mkdir();
     }
 
     @Override
     public void createFile(String filename) {
+        // TODO: provera privilegija
 
-        // Provera da li je dozvoljena ekstenzija fajla
+        // Provera da li je dozvoljena ekstenzija fajla:
         if(checkExtensions(filename)){
-            System.out.println("Greska! Nije moguce cuvati fajl u ovoj ekstenziji.");
+            System.out.println("\nGreska! Nije moguce cuvati fajl u ovoj ekstenziji.");
             return;
         }
 
+        // Kreiranje fajla:
         File newFile = new File(currentStorage.getRootDirectory() + "/" + filename);
         try {
             newFile.createNewFile();
@@ -102,11 +107,13 @@ public class LocalFileStorageImplementation implements FileStorage {
 
         File file = new File(path);
 
+        // Provera da li postoji fajl na prosledjenoj putanji:
         if(!file.exists()) {
             System.out.println("Greska! Navedeni fajl ne postoji.");
             return;
         }
 
+        // Brisanje fajla:
         String type = file.isDirectory() ? "Folder" : "Fajl";
 		boolean deleted = file.delete();
 
@@ -118,7 +125,7 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void move(String source, String destination) {
-
+        // TODO: provera privilegija
         Path result = null;
 
         try {
@@ -136,8 +143,13 @@ public class LocalFileStorageImplementation implements FileStorage {
 			System.out.println("Fajl nije premesten.");
     }
 
+    // TODO: list nad path-om? Preraditi getFileList() metodu za to, tako da prima kao argument path gde izlistavamo fajlove
+
     @Override
     public void list() {
+        // TODO: provera privilegija
+
+        // Uzimanje fajl liste u root-u:
         List<File> fileList = getFileList();
         String type;
 
@@ -151,7 +163,7 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void list(String argument, Operations operation) {
-
+        // TODO: provera privilegija
         String type;
         List<File> fileList = getFileList();
 
@@ -216,6 +228,7 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void get(String path) {
+        // TODO: provera privilegija
         move(currentStorage.getRootDirectory() + path, currentStorage.getDownloadFolder());
     }
 
@@ -293,16 +306,43 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void limitNumberOfFiles(int i, String s) {
+        // TODO: konfiguraciju skladišta može da radi samo korisnik koji je kreirao skladište!
+
+        File directory = new File(getCurrentStorage().getRootDirectory() + "/" + s);
+
+        // Provera da li postoji prosledjeni folder u trenutnom aktivnom skladistu
+        if(!directory.exists()){
+            System.out.println("Ne postoji prosledjeni folder u skladistu.");
+            return;
+        }
+
+        // Dodavanje novog para direktorijum-brFajlova u HashMap trenutnog skladista
+        currentStorage.getMaxNumberOfFilesInDirectory().put(directory, Integer.valueOf(i));
 
     }
 
     @Override
     public void limitStorageSize(long l) {
+        // TODO: konfiguraciju skladišta može da radi samo korisnik koji je kreirao skladište!
+        // TODO: posle svake nove konfiguracije, sacuvati novi config.json fajl?
 
+        currentStorage.setStorageSize(l);
     }
 
     @Override
     public void restrictExtension(String s) {
+        // TODO: konfiguraciju skladišta može da radi samo korisnik koji je kreirao skladište!
+
+        currentStorage.getUnsupportedExtensions().add(s);
+    }
+
+    @Override
+    public void addNewUser(AbstractUser abstractUser, Set<Privileges> set) {
+        // TODO: provera privilegije korisnika koji pravi novog korisnika - moze samo onaj koji je napravio skladiste
+    }
+
+    @Override
+    public void disconnectUser(AbstractUser abstractUser) {
 
     }
 
