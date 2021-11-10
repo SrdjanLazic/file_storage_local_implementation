@@ -4,10 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -134,6 +131,25 @@ public class LocalFileStorageImplementation implements FileStorage {
 			System.out.println("Fajl je uspesno premesten.");
 		else
 			System.out.println("Fajl nije premesten.");
+    }
+
+    @Override
+    public void put(String sources, String destination) {
+        Path result = null;
+
+        try {
+            result = Files.copy(Paths.get(sources), Paths.get(destination), StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
+        } catch (NoSuchFileException e1) {
+            System.out.println("Greska! Navedeni fajl ne postoji.");
+            return;
+        }catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        if(result != null)
+            System.out.println("Fajl je uspesno prekopiran.");
+        else
+            System.out.println("Fajl nije prekopiran.");
     }
 
     @Override
@@ -303,6 +319,16 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void restrictExtension(String s) {
+
+    }
+
+    @Override
+    public void addNewUser(AbstractUser abstractUser, Set<Privileges> set) {
+
+    }
+
+    @Override
+    public void disconnectUser(AbstractUser abstractUser) {
 
     }
 
