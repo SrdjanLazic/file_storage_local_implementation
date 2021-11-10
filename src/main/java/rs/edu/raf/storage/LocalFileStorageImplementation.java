@@ -1,6 +1,7 @@
 package rs.edu.raf.storage;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import rs.edu.raf.storage.exceptions.InvalidExtensionException;
 
 import java.io.File;
 import java.io.IOException;
@@ -48,12 +49,11 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
     @Override
-    public void createFile(String path, String filename) {
+    public void createFile(String path, String filename) throws InvalidExtensionException {
         // TODO: provera privilegija
         // Provera da li prosledjeni fajl ima ekstenziju koja nije dozvoljena:
         if(checkExtensions(filename)){
-            System.out.println("Greska! Nije moguce cuvati fajl u ovoj ekstenziji.");
-            return;
+            throw new InvalidExtensionException();
         }
 
         // Kreiranje fajla u datom pathu
