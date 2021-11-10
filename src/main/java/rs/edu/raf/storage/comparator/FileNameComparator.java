@@ -1,4 +1,4 @@
-package rs.edu.raf.storage;
+package rs.edu.raf.storage.comparator;
 
 import java.io.File;
 import java.util.Comparator;

@@ -1,6 +1,8 @@
 package rs.edu.raf.storage;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import rs.edu.raf.storage.comparator.FileModifiedDateComparator;
+import rs.edu.raf.storage.comparator.FileNameComparator;
 import rs.edu.raf.storage.exceptions.InvalidExtensionException;
 
 import java.io.File;
@@ -9,7 +11,7 @@ import java.nio.file.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-public class LocalFileStorageImplementation implements FileStorage {
+public class LocalFileStorageImplementation implements FileStorage, StorageConfiguration, UserManagement {
 
     static {
         StorageManager.registerStorage(new LocalFileStorageImplementation());
@@ -74,13 +76,12 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
     @Override
-    public void createFile(String filename) {
+    public void createFile(String filename) throws InvalidExtensionException {
         // TODO: provera privilegija
 
         // Provera da li je dozvoljena ekstenzija fajla:
         if(checkExtensions(filename)){
-            System.out.println("\nGreska! Nije moguce cuvati fajl u ovoj ekstenziji.");
-            return;
+            throw new InvalidExtensionException();
         }
 
         // Kreiranje fajla:
@@ -97,7 +98,7 @@ public class LocalFileStorageImplementation implements FileStorage {
     public void delete(String path) {
 
         // Provera da li trenutni korisnik skladista ima privilegiju za brisanje fajlova
-        if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.DELETE)){
+        if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.DELETE)){ // TODO: insufficient privileges exception
             System.out.println("\nNemoguce obrisati fajl - trenutni korisnik skladista nema privilegije za brisanje fajlova.");
             return;
         }
@@ -106,7 +107,7 @@ public class LocalFileStorageImplementation implements FileStorage {
 
         // Provera da li postoji fajl na prosledjenoj putanji:
         if(!file.exists()) {
-            System.out.println("Greska! Navedeni fajl ne postoji.");
+            System.out.println("Greska! Navedeni fajl ne postoji."); // TODO: file not found exception
             return;
         }
 
@@ -128,7 +129,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         try {
             result = Files.move(Paths.get(source), Paths.get(destination));
         } catch (NoSuchFileException e1) {
-            System.out.println("Greska! Navedeni fajl ne postoji.");
+            System.out.println("Greska! Navedeni fajl ne postoji."); // TODO throw new ...
             return;
         } catch (IOException e) {
             e.printStackTrace();
@@ -150,7 +151,7 @@ public class LocalFileStorageImplementation implements FileStorage {
             result = Files.copy(Paths.get(sources), Paths.get(destination), StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
         } catch (NoSuchFileException e1) {
             System.out.println("Greska! Navedeni fajl ne postoji.");
-            return;
+            return; // TODO: throw new ...
         }catch (IOException e) {
             e.printStackTrace();
         }
@@ -292,7 +293,7 @@ public class LocalFileStorageImplementation implements FileStorage {
                     e.printStackTrace();
                 }
             } else {
-                System.out.println("Neispravan username ili password!");
+                System.out.println("Neispravan username ili password!"); // TODO: new incorrect password exception
                 return;
             }
             // Pravimo novo skladiste, prilikom kreiranja User-u koji ga je kreirao dodeljujemo sve privilegije
@@ -328,7 +329,7 @@ public class LocalFileStorageImplementation implements FileStorage {
 
         // Provera da li postoji prosledjeni folder u trenutnom aktivnom skladistu
         if(!directory.exists()){
-            System.out.println("Ne postoji prosledjeni folder u skladistu.");
+            System.out.println("Ne postoji prosledjeni folder u skladistu."); // TODO: file not found exception
             return;
         }
 
@@ -369,7 +370,6 @@ public class LocalFileStorageImplementation implements FileStorage {
         boolean found = false;
         for(String extension: currentStorage.getUnsupportedExtensions()){
             if(filename.contains(extension)){
-                System.out.println("Nepodrzana ekstenzija!");
                 found = true;
             }
         }
