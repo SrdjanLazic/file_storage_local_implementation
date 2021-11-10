@@ -25,6 +25,10 @@ public class StorageModel {
     private List<String> unsupportedExtensions = new ArrayList<>();
     private Map<File, Integer> maxNumberOfFilesInDirectory = new HashMap<>();
 
+    public StorageModel(){
+
+    }
+
     public StorageModel(User user, String path) {
 
         // Provera da li folder na prosledjenoj adresi vec postoji:
@@ -48,7 +52,7 @@ public class StorageModel {
         }
 
         // Dodavanje config.json i users.json fajlova u root:
-        this.usersJSON = new File(rootDirectory + "/users.json"); // TODO: kako da append-ujemo vise usera? Uvek mi overwrite-uje
+        this.usersJSON = new File(rootDirectory + "/users.json");  // TODO: pisanje svih juzera
         this.configJSON = new File(rootDirectory + "/config.json");
         ObjectMapper mapper = new ObjectMapper();
         try {
