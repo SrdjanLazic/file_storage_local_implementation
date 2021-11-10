@@ -5,10 +5,7 @@ import rs.edu.raf.storage.exceptions.InvalidExtensionException;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -144,6 +141,25 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
     // TODO: list nad path-om? Preraditi getFileList() metodu za to, tako da prima kao argument path gde izlistavamo fajlove
+
+    @Override
+    public void put(String sources, String destination) {
+        Path result = null;
+
+        try {
+            result = Files.copy(Paths.get(sources), Paths.get(destination), StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
+        } catch (NoSuchFileException e1) {
+            System.out.println("Greska! Navedeni fajl ne postoji.");
+            return;
+        }catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        if(result != null)
+            System.out.println("Fajl je uspesno prekopiran.");
+        else
+            System.out.println("Fajl nije prekopiran.");
+    }
 
     @Override
     public void list() {
@@ -345,6 +361,8 @@ public class LocalFileStorageImplementation implements FileStorage {
     public void disconnectUser(AbstractUser abstractUser) {
 
     }
+
+
 
     // Pomocna metoda za proveravanje ekstenzije prilikom dodavanja fajla u skladiste
     public boolean checkExtensions(String filename){
