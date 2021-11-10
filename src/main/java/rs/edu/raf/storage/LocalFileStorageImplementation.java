@@ -362,15 +362,7 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     }
 
-    @Override
-    public void addNewUser(AbstractUser abstractUser, Set<Privileges> set) {
 
-    }
-
-    @Override
-    public void disconnectUser(AbstractUser abstractUser) {
-
-    }
 
     // Pomocna metoda za proveravanje ekstenzije prilikom dodavanja fajla u skladiste
     public boolean checkExtensions(String filename){
