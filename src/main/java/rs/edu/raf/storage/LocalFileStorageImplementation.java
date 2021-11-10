@@ -3,6 +3,10 @@ package rs.edu.raf.storage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import rs.edu.raf.storage.comparator.FileModifiedDateComparator;
 import rs.edu.raf.storage.comparator.FileNameComparator;
+import rs.edu.raf.storage.enums.Operations;
+import rs.edu.raf.storage.enums.Privileges;
+import rs.edu.raf.storage.exceptions.FileNotFoundException;
+import rs.edu.raf.storage.exceptions.InsufficientPrivilegesException;
 import rs.edu.raf.storage.exceptions.InvalidExtensionException;
 
 import java.io.File;
@@ -11,7 +15,7 @@ import java.nio.file.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-public class LocalFileStorageImplementation implements FileStorage, StorageConfiguration, UserManagement {
+public class LocalFileStorageImplementation implements FileStorage {
 
     static {
         StorageManager.registerStorage(new LocalFileStorageImplementation());
@@ -25,6 +29,7 @@ public class LocalFileStorageImplementation implements FileStorage, StorageConfi
     @Override
     public void createFolder(String path, String folderName) {
         // TODO: provera privilegija
+
         // Kreiranje pomocu {} patterna:
         if(folderName.contains("{") && folderName.contains("}")) {
             String filenameBase;
@@ -50,6 +55,7 @@ public class LocalFileStorageImplementation implements FileStorage, StorageConfi
     @Override
     public void createFile(String path, String filename) throws InvalidExtensionException {
         // TODO: provera privilegija
+
         // Provera da li prosledjeni fajl ima ekstenziju koja nije dozvoljena:
         if(checkExtensions(filename)){
             throw new InvalidExtensionException();
@@ -71,6 +77,7 @@ public class LocalFileStorageImplementation implements FileStorage, StorageConfi
     @Override
     public void createFolder(String folderName) {
         // TODO: provera privilegija
+
         File newFolder = new File(getCurrentStorage().getRootDirectory() + "/" + folderName);
         newFolder.mkdir();
     }
@@ -95,20 +102,18 @@ public class LocalFileStorageImplementation implements FileStorage, StorageConfi
     }
 
     @Override
-    public void delete(String path) {
+    public void delete(String path) throws FileNotFoundException, InsufficientPrivilegesException {
 
         // Provera da li trenutni korisnik skladista ima privilegiju za brisanje fajlova
-        if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.DELETE)){ // TODO: insufficient privileges exception
-            System.out.println("\nNemoguce obrisati fajl - trenutni korisnik skladista nema privilegije za brisanje fajlova.");
-            return;
+        if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.DELETE)){
+            throw new InsufficientPrivilegesException();
         }
 
         File file = new File(path);
 
         // Provera da li postoji fajl na prosledjenoj putanji:
         if(!file.exists()) {
-            System.out.println("Greska! Navedeni fajl ne postoji."); // TODO: file not found exception
-            return;
+            throw new FileNotFoundException();
         }
 
         // Brisanje fajla:
@@ -322,15 +327,18 @@ public class LocalFileStorageImplementation implements FileStorage, StorageConfi
     }
 
     @Override
-    public void limitNumberOfFiles(int i, String s) {
-        // TODO: konfiguraciju skladišta može da radi samo korisnik koji je kreirao skladište!
+    public void limitNumberOfFiles(int i, String s) throws InsufficientPrivilegesException, FileNotFoundException {
+
+        // Provera da li konfiguraciju vrsi superuser:
+        if(currentStorage.getSuperuser() != currentStorage.getCurrentUser()){
+            throw new InsufficientPrivilegesException();
+        }
 
         File directory = new File(getCurrentStorage().getRootDirectory() + "/" + s);
 
         // Provera da li postoji prosledjeni folder u trenutnom aktivnom skladistu
         if(!directory.exists()){
-            System.out.println("Ne postoji prosledjeni folder u skladistu."); // TODO: file not found exception
-            return;
+            throw new FileNotFoundException();
         }
 
         // Dodavanje novog para direktorijum-brFajlova u HashMap trenutnog skladista
@@ -339,17 +347,25 @@ public class LocalFileStorageImplementation implements FileStorage, StorageConfi
     }
 
     @Override
-    public void limitStorageSize(long l) {
-        // TODO: konfiguraciju skladišta može da radi samo korisnik koji je kreirao skladište!
+    public void limitStorageSize(long l) throws InsufficientPrivilegesException {
+
+        // Provera da li konfiguraciju vrsi superuser:
+        if(currentStorage.getSuperuser() != currentStorage.getCurrentUser()){
+            throw new InsufficientPrivilegesException();
+        }
+
         // TODO: posle svake nove konfiguracije, sacuvati novi config.json fajl?
 
         currentStorage.setStorageSize(l);
     }
 
     @Override
-    public void restrictExtension(String s) {
+    public void restrictExtension(String s) throws InsufficientPrivilegesException {
         // TODO: konfiguraciju skladišta može da radi samo korisnik koji je kreirao skladište!
 
+        if(currentStorage.getCurrentUser() != currentStorage.getSuperuser()){
+            throw new InsufficientPrivilegesException();
+        }
         currentStorage.getUnsupportedExtensions().add(s);
     }
 

@@ -24,6 +24,7 @@ public class StorageModel {
     private List<User> userList = new ArrayList<>();
     private List<String> unsupportedExtensions = new ArrayList<>();
     private Map<File, Integer> maxNumberOfFilesInDirectory = new HashMap<>();
+    ObjectMapper mapper = new ObjectMapper();
 
     public StorageModel(){
 
@@ -54,7 +55,7 @@ public class StorageModel {
         // Dodavanje config.json i users.json fajlova u root:
         this.usersJSON = new File(rootDirectory + "/users.json");  // TODO: pisanje svih juzera
         this.configJSON = new File(rootDirectory + "/config.json");
-        ObjectMapper mapper = new ObjectMapper();
+
         try {
             mapper.writeValue(usersJSON, user);
             mapper.writeValue(configJSON, this);
@@ -82,14 +83,17 @@ public class StorageModel {
 
     public void setStorageSize(long storageSize) {
         this.storageSize = storageSize;
+        updateConfig();
     }
 
     public void setMaxNumberOfFiles(int maxNumberOfFiles) {
         this.maxNumberOfFiles = maxNumberOfFiles;
+        updateConfig();
     }
 
     public void setUnsupportedExtensions(List<String> unsupportedExtensions) {
         this.unsupportedExtensions = unsupportedExtensions;
+        updateConfig();
     }
 
     public Map<File, Integer> getMaxNumberOfFilesInDirectory() {
@@ -98,6 +102,7 @@ public class StorageModel {
 
     public void setMaxNumberOfFilesInDirectory(Map<File, Integer> maxNumberOfFilesInDirectory) {
         this.maxNumberOfFilesInDirectory = maxNumberOfFilesInDirectory;
+        updateConfig();
     }
 
     public List<User> getUserList() {
@@ -118,6 +123,7 @@ public class StorageModel {
 
     public void incrementCounter(){
         this.currNumberOfFiles++;
+        updateConfig();
     }
 
     public String getDownloadFolder() {
@@ -146,6 +152,30 @@ public class StorageModel {
 
     public void setStorageFolder(File storageFolder) {
         this.storageFolder = storageFolder;
+    }
+
+    public User getSuperuser() {
+        return superuser;
+    }
+
+    public void setSuperuser(User superuser) {
+        this.superuser = superuser;
+    }
+
+    void updateConfig(){
+        try {
+            mapper.writeValue(configJSON, this);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    void updateUsers(){
+        try {
+            mapper.writeValue(usersJSON, userList);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
 
