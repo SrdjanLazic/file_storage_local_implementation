@@ -5,9 +5,7 @@ import rs.edu.raf.storage.comparator.FileModifiedDateComparator;
 import rs.edu.raf.storage.comparator.FileNameComparator;
 import rs.edu.raf.storage.enums.Operations;
 import rs.edu.raf.storage.enums.Privileges;
-import rs.edu.raf.storage.exceptions.FileNotFoundException;
-import rs.edu.raf.storage.exceptions.InsufficientPrivilegesException;
-import rs.edu.raf.storage.exceptions.InvalidExtensionException;
+import rs.edu.raf.storage.exceptions.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -21,14 +19,13 @@ public class LocalFileStorageImplementation implements FileStorage {
         StorageManager.registerStorage(new LocalFileStorageImplementation());
     }
 
-    // TODO: Exceptioni svuda za greske!
-
     private List<StorageModel> storageModelList = new ArrayList<>();
     private StorageModel currentStorage;
 
     @Override
     public void createFolder(String path, String folderName) {
 
+        // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
             throw new InsufficientPrivilegesException();
         }
@@ -44,12 +41,12 @@ public class LocalFileStorageImplementation implements FileStorage {
             secondNum = Integer.parseInt(Arrays.asList(folderName.trim().split(" ")).get(1));
 
             for (int i = firstNum; i <= secondNum; i++) {
-                File folder = new File(getCurrentStorage().getRootDirectory() + "/" + path + "/" + filenameBase + i);
+                File folder = new File(currentStorage.getRootDirectory() + "/" + path + "/" + filenameBase + i);
                 folder.mkdir();
             }
         }
         else {
-            String fullPath = getCurrentStorage().getRootDirectory() + "/" + path + "/" + folderName;
+            String fullPath = currentStorage.getRootDirectory() + "/" + path + "/" + folderName;
             File newFolder = new File(fullPath);
             newFolder.mkdir();
         }
@@ -57,6 +54,8 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void createFile(String path, String filename) throws InvalidExtensionException {
+
+        String fullPath = currentStorage.getRootDirectory() + "/" + path;
 
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
@@ -68,11 +67,20 @@ public class LocalFileStorageImplementation implements FileStorage {
             throw new InvalidExtensionException();
         }
 
+        // Provera da li cemo prekoraciti broj fajlova u nekom folderu:
+        // Prvo proverava da li u HashMap-u postoji folder u kojem se kreira novi fajl
+        // Ako postoji, proverava da li (trenutni broj fajlova u tom folderu + 1) prekoracuje maksimalan definisani iz HashMap-a
+        if(currentStorage.getMaxNumberOfFilesInDirectory().containsKey(currentStorage.getRootDirectory() + "/" + path)){
+            int numberOfFiles = new File(currentStorage.getRootDirectory() + "/" + path).listFiles().length;
+            if(numberOfFiles + 1 > currentStorage.getMaxNumberOfFilesInDirectory().get(fullPath))
+                throw new FileLimitExceededException();
+        }
+
         // Kreiranje fajla u datom pathu
-        // Metoda Files.createDirectories() kraira sve potrebne nadfoldere ako ne postoje
+        // Metoda Files.createDirectories() kreira sve potrebne nadfoldere ako ne postoje
         // Npr. ako je prosledjeno /folder/folder1/folder2, napravice sva tri foldera ako ne postoje, a onda ce smestiti fajl u folder2
         try {
-            Files.createDirectories(Paths.get(currentStorage.getRootDirectory() + path));
+            Files.createDirectories(Paths.get(fullPath));
             File newFile = new File(currentStorage.getRootDirectory() + path + "/" + filename);
             newFile.createNewFile();
             currentStorage.incrementCounter();
@@ -96,6 +104,8 @@ public class LocalFileStorageImplementation implements FileStorage {
     @Override
     public void createFile(String filename) throws InvalidExtensionException {
 
+        String fullPath = currentStorage.getRootDirectory() + "/" + filename;
+
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
             throw new InsufficientPrivilegesException();
@@ -106,8 +116,23 @@ public class LocalFileStorageImplementation implements FileStorage {
             throw new InvalidExtensionException();
         }
 
+
+        // TODO: ukloniti ovo i polje u skladistu
+        // Provera da li cemo prekoraciti broj fajlova u CELOM skladistu:
+        if(currentStorage.getMaxNumberOfFiles() < getCurrentStorage().getCurrNumberOfFiles() + 1)
+            throw new FileLimitExceededException();
+
+        // Provera da li cemo prekoraciti broj fajlova u NEKOM FOLDERU:
+        // Prvo proverava da li u HashMap-u postoji folder u kojem se kreira novi fajl
+        // Ako postoji, proverava da li (trenutni broj fajlova u tom folderu + 1) prekoracuje maksimalan definisani iz HashMap-a
+        if(currentStorage.getMaxNumberOfFilesInDirectory().containsKey(currentStorage.getRootDirectory())){
+            int numberOfFiles = new File(currentStorage.getRootDirectory()).listFiles().length;
+            if(numberOfFiles + 1 > currentStorage.getMaxNumberOfFilesInDirectory().get(currentStorage.getRootDirectory()))
+                throw new FileLimitExceededException();
+        }
+
         // Kreiranje fajla:
-        File newFile = new File(currentStorage.getRootDirectory() + "/" + filename);
+        File newFile = new File(fullPath);
         try {
             newFile.createNewFile();
             currentStorage.incrementCounter(); // inkrementiranje counter-a za broj fajlova
@@ -141,6 +166,8 @@ public class LocalFileStorageImplementation implements FileStorage {
             System.out.println("\nBrisanje nije uspelo. Proverite da li ste ispravno napisali naziv fajla i ekstenziju.");
     }
 
+    // TODO: svuda dodati apdejtovanje trenutne velicine skladista!!!
+
     @Override
     public void move(String source, String destination) {
 
@@ -149,10 +176,21 @@ public class LocalFileStorageImplementation implements FileStorage {
             throw new InsufficientPrivilegesException();
         }
 
+        // Provera prekoracenja velicine skladista u bajtovima:
+        Path sourcePath = Paths.get(source);
+        try {
+            long size = Files.size(sourcePath);
+            if(currentStorage.getCurrentStorageSize() + size > currentStorage.getStorageSizeLimit()){
+                throw new StorageSizeExceededException();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         Path result = null;
 
         try {
-            result = Files.move(Paths.get(source), Paths.get(destination));
+            result = Files.move(Paths.get(source), Paths.get(currentStorage.getRootDirectory() + "/" + destination));
         } catch (NoSuchFileException e1) {
             System.out.println("Greska! Navedeni fajl ne postoji."); // TODO throw new ...
             return;
@@ -165,8 +203,6 @@ public class LocalFileStorageImplementation implements FileStorage {
 		else
 			System.out.println("Fajl nije premesten.");
     }
-
-    // TODO: list nad path-om? Preraditi getFileList() metodu za to, tako da prima kao argument path gde izlistavamo fajlove
 
     @Override
     public void put(String sources, String destination) {
@@ -319,7 +355,7 @@ public class LocalFileStorageImplementation implements FileStorage {
                 try {
                     // Ako se podaci User-a match-uju, procitaj config, setuj trenutni storage i dodaj skladiste u listu skladista
                     StorageModel storageModel = objectMapper.readValue(new File(path + "/config.json"), StorageModel.class);
-                    this.storageModelList.add(storageModel);
+                    storageModelList.add(storageModel);
                     setCurrentStorage(storageModel);
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -354,10 +390,12 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
     @Override
-    public void limitNumberOfFiles(int i, String path) throws InsufficientPrivilegesException, FileNotFoundException {
+    public void limitNumberOfFiles(int numberOfFiles, String path) throws InsufficientPrivilegesException, FileNotFoundException {
+
+        String fullPath = getCurrentStorage().getRootDirectory() + "/" + path;
 
         // Provera da li konfiguraciju vrsi superuser:
-        if(currentStorage.getSuperuser() != currentStorage.getCurrentUser()){
+        if(!currentStorage.getSuperuser().equals(currentStorage.getCurrentUser())){
             throw new InsufficientPrivilegesException();
         }
 
@@ -369,50 +407,77 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
 
         // Dodavanje novog para direktorijum-brFajlova u HashMap trenutnog skladista
-        currentStorage.getMaxNumberOfFilesInDirectory().put(directory, Integer.valueOf(i));
-
+        currentStorage.getMaxNumberOfFilesInDirectory().put(fullPath, Integer.valueOf(numberOfFiles));
+        currentStorage.setMaxNumberOfFilesInDirectorySet(true);
+        currentStorage.updateConfig();
     }
 
     @Override
     public void limitStorageSize(long l) throws InsufficientPrivilegesException {
 
         // Provera da li konfiguraciju vrsi superuser:
-        if(currentStorage.getSuperuser() != currentStorage.getCurrentUser()){
+        if(!currentStorage.getSuperuser().equals(currentStorage.getCurrentUser())){
             throw new InsufficientPrivilegesException();
         }
 
-        currentStorage.setStorageSize(l);
+        currentStorage.setStorageSizeLimit(l);
+        currentStorage.updateConfig();
     }
 
     @Override
-    public void restrictExtension(String s) throws InsufficientPrivilegesException {
+    public void restrictExtension(String extension) throws InsufficientPrivilegesException {
 
         // Provera da li konfiguraciju vrsi superuser:
-        if(currentStorage.getCurrentUser() != currentStorage.getSuperuser()){
+        if(!currentStorage.getSuperuser().equals(currentStorage.getCurrentUser())){
             throw new InsufficientPrivilegesException();
         }
 
-        currentStorage.getUnsupportedExtensions().add(s);
+        currentStorage.getUnsupportedExtensions().add(extension);
+        currentStorage.updateConfig();
     }
 
     @Override
-    public void addNewUser(User abstractUser, Set<Privileges> set) {
+    public void addNewUser(User user, Set<Privileges> privilegesSet) {
 
         // Provera da li konfiguraciju vrsi superuser:
-        if(currentStorage.getCurrentUser() != currentStorage.getSuperuser()){
+        if(!currentStorage.getSuperuser().equals(currentStorage.getCurrentUser())){
             throw new InsufficientPrivilegesException();
         }
 
-        currentStorage.getUserList().add(abstractUser);
+        user.setPrivileges(privilegesSet);
+        currentStorage.getUserList().add(user);
+        currentStorage.updateUsers();
     }
 
     @Override
-    public void disconnectUser(User abstractUser) {
+    public void disconnectUser(User user) throws UserNotFoundException {
 
+        // Provera da li konfiguraciju vrsi superuser:
+        if(!currentStorage.getSuperuser().equals(currentStorage.getCurrentUser())){
+            throw new InsufficientPrivilegesException();
+        }
+
+        // Pronalazenje korisnika sa datim username-om i password-om:
+        User toRemove = null;
+        boolean found = false;
+        for(User u: currentStorage.getUserList()){
+            if(u.getUsername().equalsIgnoreCase(user.getUsername()) && u.getPassword().equalsIgnoreCase(user.getPassword())){
+                found = true;
+                toRemove = u;
+            }
+        }
+
+        // Ako postoji u listi, obrisi, ako ne, izbaci exception
+        if(found) {
+            currentStorage.getUserList().remove(toRemove);
+            currentStorage.updateUsers();
+        }
+        else
+            throw new UserNotFoundException();
     }
 
 
-
+    // TODO: mozda ovo nekako lepse uraditi?
     // Pomocna metoda za proveravanje ekstenzije prilikom dodavanja fajla u skladiste
     private boolean checkExtensions(String filename){
         boolean found = false;

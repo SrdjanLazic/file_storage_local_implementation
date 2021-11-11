@@ -11,19 +11,21 @@ import java.util.Map;
 
 public class StorageModel {
 
-    private File usersJSON;
-    private File configJSON;
+    private String usersJSON;
+    private String configJSON;
     private File storageFolder;
     private String downloadFolder;
     private String rootDirectory;
     private User superuser;
     private User currentUser;
-    private long storageSize;
+    private long storageSizeLimit;
+    private long currentStorageSize;
     private int maxNumberOfFiles;
+    private boolean maxNumberOfFilesInDirectorySet = false;
     private int currNumberOfFiles;
     private List<User> userList = new ArrayList<>();
     private List<String> unsupportedExtensions = new ArrayList<>();
-    private Map<File, Integer> maxNumberOfFilesInDirectory = new HashMap<>();
+    private Map<String, Integer> maxNumberOfFilesInDirectory = new HashMap<>();
     private ObjectMapper mapper = new ObjectMapper();
 
     public StorageModel(){
@@ -44,6 +46,8 @@ public class StorageModel {
         this.superuser = user;
         this.currentUser = user;
         this.userList.add(user);
+        this.usersJSON = rootDirectory + "/users.json";
+        this.configJSON = rootDirectory + "/config.json";
 
         // Kreiranje download foldera:
         File downloadFolder = new File(getRootDirectory() + "/Download");
@@ -53,13 +57,10 @@ public class StorageModel {
             this.downloadFolder = getRootDirectory() + "/Download";
         }
 
-        // Dodavanje config.json i users.json fajlova u root:
-        this.usersJSON = new File(rootDirectory + "/users.json");  // TODO: pisanje svih juzera
-        this.configJSON = new File(rootDirectory + "/config.json");
 
         try {
-            mapper.writeValue(usersJSON, user);
-            mapper.writeValue(configJSON, this);
+            mapper.writeValue(new File(usersJSON), user);
+            mapper.writeValue(new File(configJSON), this);
             currNumberOfFiles += 2; // inkrementiramo trenutni broj fajlova u skladistu
             updateConfig();
         } catch (IOException e) {
@@ -71,8 +72,8 @@ public class StorageModel {
         return rootDirectory;
     }
 
-    public long getStorageSize() {
-        return storageSize;
+    public long getStorageSizeLimit() {
+        return storageSizeLimit;
     }
 
     public List<String> getUnsupportedExtensions() {
@@ -83,28 +84,24 @@ public class StorageModel {
         return maxNumberOfFiles;
     }
 
-    public void setStorageSize(long storageSize) {
-        this.storageSize = storageSize;
-        updateConfig();
+    public void setStorageSizeLimit(long storageSizeLimit) {
+        this.storageSizeLimit = storageSizeLimit;
     }
 
     public void setMaxNumberOfFiles(int maxNumberOfFiles) {
         this.maxNumberOfFiles = maxNumberOfFiles;
-        updateConfig();
     }
 
     public void setUnsupportedExtensions(List<String> unsupportedExtensions) {
         this.unsupportedExtensions = unsupportedExtensions;
-        updateConfig();
     }
 
-    public Map<File, Integer> getMaxNumberOfFilesInDirectory() {
+    public Map<String, Integer> getMaxNumberOfFilesInDirectory() {
         return maxNumberOfFilesInDirectory;
     }
 
-    public void setMaxNumberOfFilesInDirectory(Map<File, Integer> maxNumberOfFilesInDirectory) {
+    public void setMaxNumberOfFilesInDirectory(Map<String, Integer> maxNumberOfFilesInDirectory) {
         this.maxNumberOfFilesInDirectory = maxNumberOfFilesInDirectory;
-        updateConfig();
     }
 
     public List<User> getUserList() {
@@ -125,7 +122,6 @@ public class StorageModel {
 
     public void incrementCounter(){
         this.currNumberOfFiles++;
-        updateConfig();
     }
 
     public String getDownloadFolder() {
@@ -164,20 +160,75 @@ public class StorageModel {
         this.superuser = superuser;
     }
 
-    void updateConfig(){
+    public void updateConfig(){
         try {
-            mapper.writeValue(configJSON, this);
+            mapper.writeValue(new File(configJSON), this);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    void updateUsers(){
+    public void updateUsers(){
         try {
-            mapper.writeValue(usersJSON, userList);
+            mapper.writeValue(new File(usersJSON), userList);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
+
+    public boolean isMaxNumberOfFilesInDirectorySet() {
+        return maxNumberOfFilesInDirectorySet;
+    }
+
+    public void setMaxNumberOfFilesInDirectorySet(boolean maxNumberOfFilesInDirectorySet) {
+        this.maxNumberOfFilesInDirectorySet = maxNumberOfFilesInDirectorySet;
+    }
+
+    @Override
+    public String toString() {
+        return "StorageModel{" +
+                "usersJSON=" + usersJSON +
+                ", configJSON=" + configJSON +
+                ", storageFolder=" + storageFolder +
+                ", downloadFolder='" + downloadFolder + '\'' +
+                ", rootDirectory='" + rootDirectory + '\'' +
+                ", superuser=" + superuser +
+                ", currentUser=" + currentUser +
+                ", storageSize=" + storageSizeLimit +
+                ", maxNumberOfFiles=" + maxNumberOfFiles +
+                ", currNumberOfFiles=" + currNumberOfFiles +
+                ", userList=" + userList +
+                ", unsupportedExtensions=" + unsupportedExtensions +
+                ", maxNumberOfFilesInDirectory=" + maxNumberOfFilesInDirectory +
+                ", mapper=" + mapper +
+                '}';
+    }
+
+    public String getUsersJSON() {
+        return usersJSON;
+    }
+
+    public void setUsersJSON(String usersJSON) {
+        this.usersJSON = usersJSON;
+    }
+
+    public String getConfigJSON() {
+        return configJSON;
+    }
+
+    public void setConfigJSON(String configJSON) {
+        this.configJSON = configJSON;
+    }
+
+    public long getCurrentStorageSize() {
+        return currentStorageSize;
+    }
+
+    public void setCurrentStorageSize(long currentStorageSize) {
+        this.currentStorageSize = currentStorageSize;
+    }
+
+
 }
 
