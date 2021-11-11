@@ -24,7 +24,7 @@ public class StorageModel {
     private List<User> userList = new ArrayList<>();
     private List<String> unsupportedExtensions = new ArrayList<>();
     private Map<File, Integer> maxNumberOfFilesInDirectory = new HashMap<>();
-    ObjectMapper mapper = new ObjectMapper();
+    private ObjectMapper mapper = new ObjectMapper();
 
     public StorageModel(){
 
@@ -47,6 +47,7 @@ public class StorageModel {
 
         // Kreiranje download foldera:
         File downloadFolder = new File(getRootDirectory() + "/Download");
+
         if(!downloadFolder.exists()) {
             downloadFolder.mkdir();
             this.downloadFolder = getRootDirectory() + "/Download";

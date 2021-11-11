@@ -28,7 +28,10 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void createFolder(String path, String folderName) {
-        // TODO: provera privilegija
+
+        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
+            throw new InsufficientPrivilegesException();
+        }
 
         // Kreiranje pomocu {} patterna:
         if(folderName.contains("{") && folderName.contains("}")) {
@@ -54,7 +57,11 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void createFile(String path, String filename) throws InvalidExtensionException {
-        // TODO: provera privilegija
+
+        // Provera privilegija:
+        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
+            throw new InsufficientPrivilegesException();
+        }
 
         // Provera da li prosledjeni fajl ima ekstenziju koja nije dozvoljena:
         if(checkExtensions(filename)){
@@ -76,7 +83,11 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void createFolder(String folderName) {
-        // TODO: provera privilegija
+
+        // Provera privilegija:
+        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
+            throw new InsufficientPrivilegesException();
+        }
 
         File newFolder = new File(getCurrentStorage().getRootDirectory() + "/" + folderName);
         newFolder.mkdir();
@@ -84,7 +95,11 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void createFile(String filename) throws InvalidExtensionException {
-        // TODO: provera privilegija
+
+        // Provera privilegija:
+        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
+            throw new InsufficientPrivilegesException();
+        }
 
         // Provera da li je dozvoljena ekstenzija fajla:
         if(checkExtensions(filename)){
@@ -128,7 +143,12 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void move(String source, String destination) {
-        // TODO: provera privilegija
+
+        // Provera privilegija:
+        if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
+            throw new InsufficientPrivilegesException();
+        }
+
         Path result = null;
 
         try {
@@ -169,10 +189,11 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void list() {
-        // TODO: provera privilegija
+
+        // Provera privilegija:
 
         // Uzimanje fajl liste u root-u:
-        List<File> fileList = getFileList();
+        List<File> fileList = getFileList(currentStorage.getRootDirectory());
         String type;
 
         System.out.println("\nLista fajlova i foldera u skladistu:");
@@ -185,9 +206,14 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void list(String argument, Operations operation) {
-        // TODO: provera privilegija
+
+        // Provera privilegija:
+        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.READ)){
+            throw new InsufficientPrivilegesException();
+        }
+
         String type;
-        List<File> fileList = getFileList();
+        List<File> fileList = getFileList(currentStorage.getRootDirectory());
 
         if (operation == Operations.FILTER_EXTENSION) {
             String extension = argument;
@@ -250,7 +276,8 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void get(String path) {
-        // TODO: provera privilegija
+
+        // Provera privilegija se vec desava u move metodi
         move(currentStorage.getRootDirectory() + path, currentStorage.getDownloadFolder());
     }
 
@@ -327,14 +354,14 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
     @Override
-    public void limitNumberOfFiles(int i, String s) throws InsufficientPrivilegesException, FileNotFoundException {
+    public void limitNumberOfFiles(int i, String path) throws InsufficientPrivilegesException, FileNotFoundException {
 
         // Provera da li konfiguraciju vrsi superuser:
         if(currentStorage.getSuperuser() != currentStorage.getCurrentUser()){
             throw new InsufficientPrivilegesException();
         }
 
-        File directory = new File(getCurrentStorage().getRootDirectory() + "/" + s);
+        File directory = new File(getCurrentStorage().getRootDirectory() + "/" + path);
 
         // Provera da li postoji prosledjeni folder u trenutnom aktivnom skladistu
         if(!directory.exists()){
@@ -354,35 +381,40 @@ public class LocalFileStorageImplementation implements FileStorage {
             throw new InsufficientPrivilegesException();
         }
 
-        // TODO: posle svake nove konfiguracije, sacuvati novi config.json fajl?
-
         currentStorage.setStorageSize(l);
     }
 
     @Override
     public void restrictExtension(String s) throws InsufficientPrivilegesException {
-        // TODO: konfiguraciju skladišta može da radi samo korisnik koji je kreirao skladište!
 
+        // Provera da li konfiguraciju vrsi superuser:
         if(currentStorage.getCurrentUser() != currentStorage.getSuperuser()){
             throw new InsufficientPrivilegesException();
         }
+
         currentStorage.getUnsupportedExtensions().add(s);
     }
 
     @Override
-    public void addNewUser(AbstractUser abstractUser, Set<Privileges> set) {
-        // TODO: provera privilegije korisnika koji pravi novog korisnika - moze samo onaj koji je napravio skladiste
+    public void addNewUser(User abstractUser, Set<Privileges> set) {
+
+        // Provera da li konfiguraciju vrsi superuser:
+        if(currentStorage.getCurrentUser() != currentStorage.getSuperuser()){
+            throw new InsufficientPrivilegesException();
+        }
+
+        currentStorage.getUserList().add(abstractUser);
     }
 
     @Override
-    public void disconnectUser(AbstractUser abstractUser) {
+    public void disconnectUser(User abstractUser) {
 
     }
 
 
 
     // Pomocna metoda za proveravanje ekstenzije prilikom dodavanja fajla u skladiste
-    public boolean checkExtensions(String filename){
+    private boolean checkExtensions(String filename){
         boolean found = false;
         for(String extension: currentStorage.getUnsupportedExtensions()){
             if(filename.contains(extension)){
@@ -393,8 +425,8 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
     // Listanje fajlova u root direktorijumu:
-    private List<File> getFileList() {
-        File directory = new File(currentStorage.getRootDirectory());
+    private List<File> getFileList(String path) {
+        File directory = new File(path);
         File[] fileList = directory.listFiles();
         return Arrays.asList(fileList);
     }
