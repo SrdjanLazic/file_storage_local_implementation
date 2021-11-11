@@ -61,6 +61,7 @@ public class StorageModel {
             mapper.writeValue(usersJSON, user);
             mapper.writeValue(configJSON, this);
             currNumberOfFiles += 2; // inkrementiramo trenutni broj fajlova u skladistu
+            updateConfig();
         } catch (IOException e) {
             e.printStackTrace();
         }

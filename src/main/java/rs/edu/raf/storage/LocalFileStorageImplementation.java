@@ -173,7 +173,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         Path result = null;
 
         try {
-            result = Files.copy(Paths.get(sources), Paths.get(destination), StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
+            result = Files.copy(Paths.get(sources), Paths.get(destination), StandardCopyOption.COPY_ATTRIBUTES);
         } catch (NoSuchFileException e1) {
             System.out.println("Greska! Navedeni fajl ne postoji.");
             return; // TODO: throw new ...
