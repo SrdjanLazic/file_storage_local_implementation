@@ -19,10 +19,9 @@ public class StorageModel {
     private User superuser;
     private User currentUser;
     private long storageSizeLimit;
-    private long currentStorageSize;
-    private int maxNumberOfFiles;
+    private boolean storageSizeLimitSet = false;
     private boolean maxNumberOfFilesInDirectorySet = false;
-    private int currNumberOfFiles;
+    private long currentStorageSize;
     private List<User> userList = new ArrayList<>();
     private List<String> unsupportedExtensions = new ArrayList<>();
     private Map<String, Integer> maxNumberOfFilesInDirectory = new HashMap<>();
@@ -41,7 +40,6 @@ public class StorageModel {
 
         // Inicijalizacija parametara:
         this.storageFolder = storageFolder;
-        this.currNumberOfFiles = 0;
         this.rootDirectory = path;
         this.superuser = user;
         this.currentUser = user;
@@ -61,7 +59,6 @@ public class StorageModel {
         try {
             mapper.writeValue(new File(usersJSON), user);
             mapper.writeValue(new File(configJSON), this);
-            currNumberOfFiles += 2; // inkrementiramo trenutni broj fajlova u skladistu
             updateConfig();
         } catch (IOException e) {
             e.printStackTrace();
@@ -80,16 +77,8 @@ public class StorageModel {
         return unsupportedExtensions;
     }
 
-    public int getMaxNumberOfFiles() {
-        return maxNumberOfFiles;
-    }
-
     public void setStorageSizeLimit(long storageSizeLimit) {
         this.storageSizeLimit = storageSizeLimit;
-    }
-
-    public void setMaxNumberOfFiles(int maxNumberOfFiles) {
-        this.maxNumberOfFiles = maxNumberOfFiles;
     }
 
     public void setUnsupportedExtensions(List<String> unsupportedExtensions) {
@@ -110,18 +99,6 @@ public class StorageModel {
 
     public void setUserList(List<User> userList) {
         this.userList = userList;
-    }
-
-    public int getCurrNumberOfFiles() {
-        return currNumberOfFiles;
-    }
-
-    public void setCurrNumberOfFiles(int currNumberOfFiles) {
-        this.currNumberOfFiles = currNumberOfFiles;
-    }
-
-    public void incrementCounter(){
-        this.currNumberOfFiles++;
     }
 
     public String getDownloadFolder() {
@@ -196,8 +173,6 @@ public class StorageModel {
                 ", superuser=" + superuser +
                 ", currentUser=" + currentUser +
                 ", storageSize=" + storageSizeLimit +
-                ", maxNumberOfFiles=" + maxNumberOfFiles +
-                ", currNumberOfFiles=" + currNumberOfFiles +
                 ", userList=" + userList +
                 ", unsupportedExtensions=" + unsupportedExtensions +
                 ", maxNumberOfFilesInDirectory=" + maxNumberOfFilesInDirectory +
@@ -229,6 +204,12 @@ public class StorageModel {
         this.currentStorageSize = currentStorageSize;
     }
 
+    public boolean isStorageSizeLimitSet() {
+        return storageSizeLimitSet;
+    }
 
+    public void setStorageSizeLimitSet(boolean storageSizeLimitSet) {
+        this.storageSizeLimitSet = storageSizeLimitSet;
+    }
 }
 
