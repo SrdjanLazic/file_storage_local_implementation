@@ -13,6 +13,8 @@ import java.nio.file.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+// TODO: privilegija za neki folder
+
 public class LocalFileStorageImplementation implements FileStorage {
 
     static {
@@ -319,7 +321,7 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     // TODO: mozda vracati nesto iz funkcije list?
     @Override
-    public void list() {
+    public void list(String path) {
 
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.READ)){
@@ -327,7 +329,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
 
         // Uzimanje fajl liste u root-u:
-        List<File> fileList = getFileList(currentStorage.getRootDirectory());
+        List<File> fileList = getFileList(currentStorage.getRootDirectory() + "/" + path);
         String type;
 
         System.out.println("\nLista fajlova i foldera u skladistu:");
@@ -338,9 +340,8 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
     }
 
-    // TODO: da ne bude uvek samo root
     @Override
-    public void list(String argument, Operations operation) {
+    public void list(String path, String argument, Operations operation) {
 
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.READ)){
@@ -348,7 +349,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
 
         String type;
-        List<File> fileList = getFileList(currentStorage.getRootDirectory());
+        List<File> fileList = getFileList(currentStorage.getRootDirectory() + "/" + path);
 
         if (operation == Operations.FILTER_EXTENSION) {
             String extension = argument;
@@ -368,7 +369,7 @@ public class LocalFileStorageImplementation implements FileStorage {
             }
         } else if (operation == Operations.SORT_BY_NAME_ASC || operation == Operations.SORT_BY_NAME_DESC) {
             String order;
-            if(operation == Operations.SORT_BY_NAME_ASC) {
+            if(operation == Operations.SORT_BY_NAME_DESC) {
                 fileList.sort(new FileNameComparator());
                 order = " rastuce ";
             }
@@ -431,26 +432,32 @@ public class LocalFileStorageImplementation implements FileStorage {
             String password = scanner.nextLine();
 
             ObjectMapper objectMapper = new ObjectMapper();
-            User user = null;
+            List<User> users = new ArrayList<>();
             try {
-                user = objectMapper.readValue(new File(path + "/users.json"), User.class);
+                users = Arrays.asList(objectMapper.readValue(new File(path + "/users.json"), User[].class));
             } catch (IOException e) {
                 e.printStackTrace();
             }
 
+            boolean found = false;
+
             // Provera kredencijala - uporedjivanje prosledjenih username i password-a i procitanih iz users.json fajla
-            if(username.equalsIgnoreCase(user.getUsername()) && password.equalsIgnoreCase(user.getPassword())){
-                try {
-                    // Ako se podaci User-a match-uju, procitaj config, setuj trenutni storage i dodaj skladiste u listu skladista
-                    StorageModel storageModel = objectMapper.readValue(new File(path + "/config.json"), StorageModel.class);
-                    storageModelList.add(storageModel);
-                    setCurrentStorage(storageModel);
-                } catch (IOException e) {
-                    e.printStackTrace();
+            for(User user: users) {
+                if (username.equalsIgnoreCase(user.getUsername()) && password.equalsIgnoreCase(user.getPassword())) {
+                    found = true;
+                    try {
+                        // Ako se podaci User-a match-uju, procitaj config, setuj trenutni storage i dodaj skladiste u listu skladista
+                        StorageModel storageModel = objectMapper.readValue(new File(path + "/config.json"), StorageModel.class);
+                        storageModelList.add(storageModel);
+                        setCurrentStorage(storageModel);
+                        currentStorage.setCurrentUser(user);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
-            } else {
-                throw new UserNotFoundException();
             }
+            if(!found)
+                throw new UserNotFoundException();
             // Pravimo novo skladiste, prilikom kreiranja User-u koji ga je kreirao dodeljujemo sve privilegije
         } else {
             System.out.println("Direktorijum nije skladiste. Da li zelite da kreirate novo skladiste? Unesite DA ili NE");
@@ -472,7 +479,6 @@ public class LocalFileStorageImplementation implements FileStorage {
                 System.out.println("Skladiste nije kreirano.");
                 return;
             }
-
         }
     }
 
@@ -532,13 +538,19 @@ public class LocalFileStorageImplementation implements FileStorage {
             throw new InsufficientPrivilegesException();
         }
 
+        // Provera da li korisnik vec postoji:
+        if(currentStorage.getUserList().contains(user)){
+            throw new UserAlreadyExistsException();
+        }
+
         user.setPrivileges(privilegesSet);
         currentStorage.getUserList().add(user);
         currentStorage.updateUsers();
+        currentStorage.updateConfig();
     }
 
     @Override
-    public void disconnectUser(User user) throws UserNotFoundException {
+    public void removeUser(User user) throws UserNotFoundException {
 
         // Provera da li konfiguraciju vrsi superuser:
         if(!currentStorage.getSuperuser().equals(currentStorage.getCurrentUser())){
@@ -559,9 +571,51 @@ public class LocalFileStorageImplementation implements FileStorage {
         if(found) {
             currentStorage.getUserList().remove(toRemove);
             currentStorage.updateUsers();
+            currentStorage.updateConfig();
         }
         else
             throw new UserNotFoundException();
+    }
+
+    // TODO: istestirati
+    @Override
+    public void login(User user) {
+
+        User findUser = null;
+
+        // Prodji kroz sve usere:
+        for(User u: currentStorage.getUserList()){
+            if(u.equals(user))
+                findUser = u;
+        }
+
+        currentStorage.setCurrentUser(findUser);
+        currentStorage.updateConfig();
+        currentStorage.updateUsers();
+    }
+
+    // TODO: kod svih operacija sa skladistem uraditi proveru, ako je currentUser == null -> nijedan korisnik nije logovan, ne moze da se izvrsi
+    @Override
+    public void logout(User user) {
+        User findUser = null;
+
+        // Prodji kroz sve usere:
+        for(User u: currentStorage.getUserList()){
+            if(u.equals(user))
+                findUser = u;
+        }
+
+        if(findUser == null)
+            throw new UserNotFoundException();
+
+        if(!currentStorage.getCurrentUser().equals(findUser))
+            throw new UserLogoutException();
+
+        currentStorage.setCurrentUser(null);
+        currentStorage.updateUsers();
+        currentStorage.updateConfig();
+
+
     }
 
 
