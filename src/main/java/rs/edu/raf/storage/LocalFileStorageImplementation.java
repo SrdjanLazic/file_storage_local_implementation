@@ -623,7 +623,7 @@ public class LocalFileStorageImplementation implements FileStorage {
     private boolean checkExtensions(String filename){
         boolean found = false;
         for(String extension: currentStorage.getUnsupportedExtensions()){
-            if(filename.contains(extension))
+            if(filename.endsWith(extension))
                 found = true;
         }
         return found;
