@@ -25,12 +25,24 @@ public class LocalFileStorageImplementation implements FileStorage {
     private StorageModel currentStorage;
 
     @Override
-    public void createFolder(String path, String ...folderNames) {
+    public void createFolder(String path, String ...folderNames) throws InsufficientPrivilegesException, FileNotFoundException{
 
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
             throw new InsufficientPrivilegesException();
         }
+
+        //TODO: Provera sta se desi ako se ne pronadje path - u DRIVEu moze kao file not found jer ja mogu bas da proverim postojanje patha
+        String destinationPath = currentStorage.getRootDirectory() + "/" + path;
+        boolean found = false;
+        for(File f : getFileList(currentStorage.getRootDirectory())){
+            String s = f.toString();
+            if(destinationPath.equalsIgnoreCase(s))
+                found = true;
+        }
+        if(!found)
+            throw new FileNotFoundException();
+
         for(String folderName: folderNames) {
             System.out.println("\nFOLDER NAMES: " + folderName);
             // Kreiranje pomocu {} patterna:
@@ -56,7 +68,7 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
     @Override
-    public void createFile(String path, String ...filenames) throws InvalidExtensionException {
+    public void createFile(String path, String ...filenames) throws InvalidExtensionException, InsufficientPrivilegesException, FileLimitExceededException, FileNotFoundException {
 
         String fullPath = currentStorage.getRootDirectory() + "/" + path;
 
@@ -64,6 +76,17 @@ public class LocalFileStorageImplementation implements FileStorage {
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
             throw new InsufficientPrivilegesException();
         }
+
+        //TODO: Provera sta se desi ako se ne pronadje path - u DRIVEu moze kao file not found jer ja mogu bas da proverim postojanje patha
+        String destinationPath = currentStorage.getRootDirectory() + "/" + path;
+        boolean found = false;
+        for(File f : getFileList(currentStorage.getRootDirectory())){
+            String s = f.toString();
+            if(destinationPath.equalsIgnoreCase(s))
+                found = true;
+        }
+        if(!found)
+            throw new FileNotFoundException();
 
         // Provera da li cemo prekoraciti broj fajlova u nekom folderu:
         // Prvo proverava da li u HashMap-u postoji folder u kojem se kreira novi fajl
@@ -124,7 +147,7 @@ public class LocalFileStorageImplementation implements FileStorage {
 
 
     @Override
-    public void createFile(String filename) throws InvalidExtensionException {
+    public void createFile(String filename) throws InvalidExtensionException, InsufficientPrivilegesException, FileLimitExceededException {
 
         String fullPath = currentStorage.getRootDirectory() + "/" + filename;
 
@@ -195,7 +218,7 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
     @Override
-    public void move(String destination, String ...sources) {
+    public void move(String destination, String ...sources) throws InsufficientPrivilegesException, FileLimitExceededException, FileNotFoundException, StorageSizeExceededException, InvalidExtensionException{
 
         // Provera privilegija:
         if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
@@ -208,6 +231,17 @@ public class LocalFileStorageImplementation implements FileStorage {
             if(numberOfFiles + 1 > currentStorage.getMaxNumberOfFilesInDirectory().get(destination))
                 throw new FileLimitExceededException();
         }
+
+        //TODO: Provera sta se desi ako se ne pronadje path - u DRIVEu moze kao file not found jer ja mogu bas da proverim postojanje patha
+        String destinationPath = currentStorage.getRootDirectory() + "/" + destination;
+        boolean found = false;
+        for(File f : getFileList(currentStorage.getRootDirectory())){
+            String s = f.toString();
+            if(destinationPath.equalsIgnoreCase(s))
+                found = true;
+        }
+        if(!found)
+            throw new FileNotFoundException();
 
         for(String source: sources) {
 
@@ -260,20 +294,29 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
     @Override
-    public void put(String destination, String ...sources) throws FileAlreadyInStorageException {
+    public void put(String destination, String ...sources) throws FileAlreadyInStorageException,FileNotFoundException, InsufficientPrivilegesException, FileLimitExceededException, InvalidExtensionException, StorageSizeExceededException {
 
         // Provera privilegija:
         if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
             throw new InsufficientPrivilegesException();
         }
 
-        // Provera prekoracenja broja fajlova u folderu:
-        if(currentStorage.getMaxNumberOfFilesInDirectory().containsKey(destination)){
-            int numberOfFiles = new File(destination).getParentFile().listFiles().length;
-            if(numberOfFiles + 1 > currentStorage.getMaxNumberOfFilesInDirectory().get(destination))
-                throw new FileLimitExceededException();
+        //TODO: Provera sta se desi ako se ne pronadje path - u DRIVEu moze kao file not found jer ja mogu bas da proverim postojanje patha
+        String destinationPath = currentStorage.getRootDirectory() + "/" + destination;
+        boolean found = false;
+        for(File f : getFileList(currentStorage.getRootDirectory())){
+            String s = f.toString();
+            if(destinationPath.equalsIgnoreCase(s))
+                found = true;
         }
+
         for(String source: sources) {
+            // Provera prekoracenja broja fajlova u folderu:
+            if(currentStorage.getMaxNumberOfFilesInDirectory().containsKey(destination)){
+                int numberOfFiles = new File(destination).getParentFile().listFiles().length;
+                if(numberOfFiles + 1 > currentStorage.getMaxNumberOfFilesInDirectory().get(destination))
+                    throw new FileLimitExceededException();
+            }
 
             Path sourcePath = Paths.get(source);
 
@@ -321,12 +364,23 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     // TODO: mozda vracati nesto iz funkcije list?
     @Override
-    public void list(String path) {
+    public void list(String path) throws InsufficientPrivilegesException, FileNotFoundException{
 
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.READ)){
             throw new InsufficientPrivilegesException();
         }
+
+        //TODO: Provera sta se desi ako se ne pronadje path - u DRIVEu moze kao file not found jer ja mogu bas da proverim postojanje patha
+        String destinationPath = currentStorage.getRootDirectory() + "/" + path;
+        boolean found = false;
+        for(File f : getFileList(currentStorage.getRootDirectory())){
+            String s = f.toString();
+            if(destinationPath.equalsIgnoreCase(s))
+                found = true;
+        }
+        if(!found)
+            throw new FileNotFoundException();
 
         // Uzimanje fajl liste u root-u:
         List<File> fileList = getFileList(currentStorage.getRootDirectory() + "/" + path);
@@ -341,12 +395,23 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
     @Override
-    public void list(String path, String argument, Operations operation) {
+    public void list(String path, String argument, Operations operation) throws InsufficientPrivilegesException, FileNotFoundException{
 
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.READ)){
             throw new InsufficientPrivilegesException();
         }
+
+        //TODO: Provera sta se desi ako se ne pronadje path - u DRIVEu moze kao file not found jer ja mogu bas da proverim postojanje patha
+        String destinationPath = currentStorage.getRootDirectory() + "/" + path;
+        boolean found = false;
+        for(File f : getFileList(currentStorage.getRootDirectory())){
+            String s = f.toString();
+            if(destinationPath.equalsIgnoreCase(s))
+                found = true;
+        }
+        if(!found)
+            throw new FileNotFoundException();
 
         String type;
         List<File> fileList = getFileList(currentStorage.getRootDirectory() + "/" + path);
@@ -579,7 +644,7 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     // TODO: istestirati
     @Override
-    public void login(User user) {
+    public void login(User user) throws UserNotFoundException, UserAlreadyLoggedInException{
 
         User findUser = null;
 
@@ -589,6 +654,12 @@ public class LocalFileStorageImplementation implements FileStorage {
                 findUser = u;
         }
 
+        if(findUser == null)
+            throw new UserNotFoundException();
+
+        if(currentStorage.getCurrentUser().equals(findUser))
+            throw new UserAlreadyLoggedInException();
+
         currentStorage.setCurrentUser(findUser);
         currentStorage.updateConfig();
         currentStorage.updateUsers();
@@ -596,7 +667,7 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     // TODO: kod svih operacija sa skladistem uraditi proveru, ako je currentUser == null -> nijedan korisnik nije logovan, ne moze da se izvrsi
     @Override
-    public void logout(User user) {
+    public void logout(User user) throws UserNotFoundException, UserLogoutException{
         User findUser = null;
 
         // Prodji kroz sve usere:
