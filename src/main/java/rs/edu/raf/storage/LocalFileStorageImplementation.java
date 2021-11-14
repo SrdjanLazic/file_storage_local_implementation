@@ -28,7 +28,7 @@ public class LocalFileStorageImplementation implements FileStorage {
     public void createFolder(String path, String ...folderNames) throws InsufficientPrivilegesException, FileNotFoundException{
 
         // Provera privilegija:
-        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
+        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.CREATE)){
             throw new InsufficientPrivilegesException();
         }
 
@@ -73,7 +73,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         String fullPath = currentStorage.getRootDirectory() + "/" + path;
 
         // Provera privilegija:
-        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
+        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.CREATE)){
             throw new InsufficientPrivilegesException();
         }
 
@@ -122,7 +122,7 @@ public class LocalFileStorageImplementation implements FileStorage {
     public void createFolder(String folderName) {
 
         // Provera privilegija:
-        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
+        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.CREATE)){
             throw new InsufficientPrivilegesException();
         }
         if (folderName.contains("{") && folderName.contains("}")) {
@@ -152,7 +152,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         String fullPath = currentStorage.getRootDirectory() + "/" + filename;
 
         // Provera privilegija:
-        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
+        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.CREATE)){
             throw new InsufficientPrivilegesException();
         }
 
@@ -209,7 +209,11 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void get(String ...paths) {
-        // Provera privilegija se vec desava u move metodi
+        // Provera privilegija:
+        if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.DOWNLOAD)){
+            throw new InsufficientPrivilegesException();
+        }
+
         for(String path: paths) {
             move("Download", path);
             currentStorage.setCurrentStorageSize(currentStorage.getCurrentStorageSize() + new File(path).length());
@@ -221,7 +225,7 @@ public class LocalFileStorageImplementation implements FileStorage {
     public void move(String destination, String ...sources) throws InsufficientPrivilegesException, FileLimitExceededException, FileNotFoundException, StorageSizeExceededException, InvalidExtensionException{
 
         // Provera privilegija:
-        if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
+        if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.CREATE)){
             throw new InsufficientPrivilegesException();
         }
 
@@ -297,7 +301,7 @@ public class LocalFileStorageImplementation implements FileStorage {
     public void put(String destination, String ...sources) throws FileAlreadyInStorageException,FileNotFoundException, InsufficientPrivilegesException, FileLimitExceededException, InvalidExtensionException, StorageSizeExceededException {
 
         // Provera privilegija:
-        if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.WRITE)){
+        if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.CREATE)){
             throw new InsufficientPrivilegesException();
         }
 
@@ -362,12 +366,12 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
     }
 
-    // TODO: mozda vracati nesto iz funkcije list?
+    // TODO: vracanje list<>
     @Override
     public void list(String path) throws InsufficientPrivilegesException, FileNotFoundException{
 
         // Provera privilegija:
-        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.READ)){
+        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.VIEW)){
             throw new InsufficientPrivilegesException();
         }
 
@@ -398,7 +402,7 @@ public class LocalFileStorageImplementation implements FileStorage {
     public void list(String path, String argument, Operations operation) throws InsufficientPrivilegesException, FileNotFoundException{
 
         // Provera privilegija:
-        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.READ)){
+        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.VIEW)){
             throw new InsufficientPrivilegesException();
         }
 
