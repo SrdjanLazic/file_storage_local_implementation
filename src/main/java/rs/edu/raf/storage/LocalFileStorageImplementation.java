@@ -340,6 +340,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
     }
 
+    // TODO: ne sme ispis!!!
     @Override
     public void list(String path, String argument, Operations operation) {
 
