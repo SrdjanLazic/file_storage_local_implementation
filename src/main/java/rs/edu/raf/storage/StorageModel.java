@@ -1,13 +1,12 @@
 package rs.edu.raf.storage;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import rs.edu.raf.storage.enums.Privileges;
+import rs.edu.raf.storage.user_management.User;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class StorageModel {
 
@@ -26,6 +25,12 @@ public class StorageModel {
     private List<User> userList = new ArrayList<>();
     private List<String> unsupportedExtensions = new ArrayList<>();
     private Map<String, Integer> maxNumberOfFilesInDirectory = new HashMap<>();
+    // TODO:
+    // D:/storage/folder1 : {DELETE, CREATE, VIEW}
+    // folder2 : {VIEW}
+    // if(!currentStorage.getFolderPrivileges.get(folderName).contains(Privileges.VIEW))
+        // throw new InsufficientPrivilegesException();
+    private Map<String, Set<Privileges>> folderPrivileges = new HashMap<>();
     private ObjectMapper mapper = new ObjectMapper();
 
     public StorageModel(){
@@ -211,6 +216,14 @@ public class StorageModel {
 
     public void setStorageSizeLimitSet(boolean storageSizeLimitSet) {
         this.storageSizeLimitSet = storageSizeLimitSet;
+    }
+
+    public Map<String, Set<Privileges>> getFolderPrivileges() {
+        return folderPrivileges;
+    }
+
+    public void setFolderPrivileges(Map<String, Set<Privileges>> folderPrivileges) {
+        this.folderPrivileges = folderPrivileges;
     }
 }
 
