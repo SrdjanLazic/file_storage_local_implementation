@@ -11,6 +11,7 @@ import java.util.Map;
 
 public class StorageModel {
 
+    //TODO: privilegije za foldere
     private String usersJSON;
     private String configJSON;
     private File storageFolder;

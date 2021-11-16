@@ -1,5 +1,6 @@
 package rs.edu.raf.storage;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import rs.edu.raf.storage.comparator.FileModifiedDateComparator;
 import rs.edu.raf.storage.comparator.FileNameComparator;
@@ -14,6 +15,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 // TODO: privilegija za neki folder
+// TODO: KB umesto MB
 
 public class LocalFileStorageImplementation implements FileStorage {
 
@@ -21,7 +23,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         StorageManager.registerStorage(new LocalFileStorageImplementation());
     }
 
-    private List<StorageModel> storageModelList = new ArrayList<>();
+    private final List<StorageModel> storageModelList = new ArrayList<>();
     private StorageModel currentStorage;
 
     @Override
@@ -195,7 +197,6 @@ public class LocalFileStorageImplementation implements FileStorage {
             }
 
             // Brisanje fajla:
-            String type = file.isDirectory() ? "Folder" : "Fajl";
             boolean deleted = file.delete();
 
             if (deleted) {
@@ -221,6 +222,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
     }
 
+    // TODO: sources.length za variadic
     @Override
     public void move(String destination, String ...sources) throws InsufficientPrivilegesException, FileLimitExceededException, FileNotFoundException, StorageSizeExceededException, InvalidExtensionException{
 
@@ -232,7 +234,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         // Provera prekoracenja broja fajlova u folderu:
         if(currentStorage.getMaxNumberOfFilesInDirectory().containsKey(destination)){
             int numberOfFiles = new File(destination).listFiles().length;
-            if(numberOfFiles + 1 > currentStorage.getMaxNumberOfFilesInDirectory().get(destination))
+            if(numberOfFiles + sources.length > currentStorage.getMaxNumberOfFilesInDirectory().get(destination))
                 throw new FileLimitExceededException();
         }
 
@@ -278,8 +280,6 @@ public class LocalFileStorageImplementation implements FileStorage {
             Path result = null;
 
             try {
-                System.out.println("SORS: " + source);
-                System.out.println("DEST: " + currentStorage.getRootDirectory() + "/" + destination + "/" + Paths.get(source).getFileName());
                 result = Files.move(Paths.get(source), Paths.get(currentStorage.getRootDirectory() + "/" + destination + "/" + Paths.get(source).getFileName()), StandardCopyOption.REPLACE_EXISTING);
                 currentStorage.setCurrentStorageSize(currentStorage.getCurrentStorageSize() + Files.size(sourcePath));
                 currentStorage.updateConfig();
@@ -306,13 +306,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
 
         //TODO: Provera sta se desi ako se ne pronadje path - u DRIVEu moze kao file not found jer ja mogu bas da proverim postojanje patha
-        String destinationPath = currentStorage.getRootDirectory() + "/" + destination;
-        boolean found = false;
-        for(File f : getFileList(currentStorage.getRootDirectory())){
-            String s = f.toString();
-            if(destinationPath.equalsIgnoreCase(s))
-                found = true;
-        }
+
 
         for(String source: sources) {
             // Provera prekoracenja broja fajlova u folderu:
@@ -353,10 +347,8 @@ public class LocalFileStorageImplementation implements FileStorage {
                 result = Files.copy(sourcePath, Paths.get(currentStorage.getRootDirectory() + "/" + destination), StandardCopyOption.COPY_ATTRIBUTES);
                 currentStorage.setCurrentStorageSize(currentStorage.getCurrentStorageSize() + Files.size(sourcePath));
                 currentStorage.updateConfig();
-            } catch (NoSuchFileException e1) {
+            } catch (IOException e1) {
                 e1.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
             }
 
             if (result != null)
@@ -367,113 +359,200 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
     // TODO: vracanje list<>
+    // TODO: podfolderi
     @Override
-    public void list(String path) throws InsufficientPrivilegesException, FileNotFoundException{
+    public Collection<String> list(String path, boolean searchSubdirectories) throws InsufficientPrivilegesException, FileNotFoundException {
+
+        String destinationPath = currentStorage.getRootDirectory() + "/" + path;
+
+        Collection<String> toReturn = new ArrayList<>();
 
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.VIEW)){
             throw new InsufficientPrivilegesException();
         }
 
-        //TODO: Provera sta se desi ako se ne pronadje path - u DRIVEu moze kao file not found jer ja mogu bas da proverim postojanje patha
-        String destinationPath = currentStorage.getRootDirectory() + "/" + path;
-        boolean found = false;
-        for(File f : getFileList(currentStorage.getRootDirectory())){
-            String s = f.toString();
-            if(destinationPath.equalsIgnoreCase(s))
-                found = true;
-        }
-        if(!found)
+        // Provera da li putanja postoji:
+        if(!new File(destinationPath).exists())
             throw new FileNotFoundException();
 
         // Uzimanje fajl liste u root-u:
-        List<File> fileList = getFileList(currentStorage.getRootDirectory() + "/" + path);
-        String type;
+        List<File> fileList = getFileList(destinationPath);
 
-        System.out.println("\nLista fajlova i foldera u skladistu:");
-        System.out.println("-----------------------------------\n");
-        for (File file: fileList){
-            type = file.isDirectory() ? "DIR" : "FILE";
-            System.out.println(file.getName() + " --- " + file.length() / (1024 * 1024) + " MB " + " --- " + type);
+//        System.out.println("\nLista fajlova i foldera u skladistu:");
+//        System.out.println("-----------------------------------\n");
+        if(searchSubdirectories) {
+            for (File file : fileList) {
+                if(file.isFile()){
+                    toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                } else {
+                    String fullPath = file.getPath();
+                    fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
+                    toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                    toReturn = listRecursive(fullPath, true, toReturn);
+                }
+            }
+        } else {
+            for (File file : fileList) {
+                if(file.isFile()){
+                    toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                } else {
+                    toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                }
+            }
         }
+        return toReturn;
     }
 
+
     // TODO: ne sme ispis!!!
+    // TODO: srediti sortiranje
     @Override
-    public void list(String path, String argument, Operations operation) throws InsufficientPrivilegesException, FileNotFoundException{
+    public Collection<String> list(String path, String argument, Operations operation, boolean searchSubdirectories) throws InsufficientPrivilegesException, FileNotFoundException {
+
+        String destinationPath = currentStorage.getRootDirectory() + "/" + path;
+
+        // TODO: popuniti listu
+        Collection<String> toReturn = new ArrayList<>();
 
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.VIEW)){
             throw new InsufficientPrivilegesException();
         }
 
-        //TODO: Provera sta se desi ako se ne pronadje path - u DRIVEu moze kao file not found jer ja mogu bas da proverim postojanje patha
-        String destinationPath = currentStorage.getRootDirectory() + "/" + path;
-        boolean found = false;
-        for(File f : getFileList(currentStorage.getRootDirectory())){
-            String s = f.toString();
-            if(destinationPath.equalsIgnoreCase(s))
-                found = true;
-        }
-        if(!found)
+        // Provera da li postoji fajl:
+        if(!new File(destinationPath).exists())
             throw new FileNotFoundException();
 
-        String type;
         List<File> fileList = getFileList(currentStorage.getRootDirectory() + "/" + path);
 
         if (operation == Operations.FILTER_EXTENSION) {
             String extension = argument;
-            System.out.println("\nLista fajlova sa datom ekstenzijom u skladistu:");
-            System.out.println("------------------------------------------------\n");
-            for (File file : fileList) {
-                if (file.getName().endsWith(extension))
-                    System.out.println(file.getPath());
+
+            if(searchSubdirectories) {
+                for (File file : fileList) {
+                    if(file.isFile()) {
+                        if (file.getName().endsWith(extension))
+                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                    } else {
+                        String fullPath = file.getPath();
+                        fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
+                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                        toReturn = listRecursive(fullPath, extension, Operations.FILTER_EXTENSION, true, toReturn);
+                    }
+                }
+            } else {
+                for (File file : fileList) {
+                    if(file.isFile()){
+                        if (file.getName().endsWith(extension))
+                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                    } else {
+                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                    }
+                }
             }
         } else if (operation == Operations.FILTER_FILENAME) {
             String filename = argument;
-            System.out.println("\nLista fajlova ciji nazivi sadrze dati tekst:");
-            System.out.println("----------------------------------------------\n");
-            for (File file : fileList) {
-                if (file.getName().contains(filename))
-                    System.out.println(file.getPath());
+//            System.out.println("\nLista fajlova ciji nazivi sadrze dati tekst:");
+//            System.out.println("----------------------------------------------\n");
+            if(searchSubdirectories) {
+                for (File file : fileList) {
+                    if(file.isFile()) {
+                        if (file.getName().contains(filename))
+                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                    } else {
+                        String fullPath = file.getPath();
+                        fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
+                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                        toReturn = listRecursive(fullPath, filename, Operations.FILTER_FILENAME, true, toReturn);
+                    }
+                }
+            } else {
+                for (File file : fileList) {
+                    if(file.isFile()){
+                        if (file.getName().endsWith(filename))
+                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                    } else {
+                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                    }
+                }
             }
         } else if (operation == Operations.SORT_BY_NAME_ASC || operation == Operations.SORT_BY_NAME_DESC) {
-            String order;
-            if(operation == Operations.SORT_BY_NAME_DESC) {
-                fileList.sort(new FileNameComparator());
-                order = " rastuce ";
+            if(searchSubdirectories) {
+                for (File file : fileList) {
+                    if(file.isFile()) {
+                        toReturn.add(file.getPath());
+                    } else {
+                        String fullPath = file.getPath();
+                        fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
+                        toReturn.add(file.getPath());
+                        toReturn = listRecursive(fullPath, null, operation, true, toReturn);
+                    }
+                }
+            } else {
+                for (File file : fileList) {
+                    if(file.isFile()){
+                        toReturn.add(file.getPath());
+                    } else {
+                        toReturn.add(file.getPath());
+                    }
+                }
             }
-            else {
-                fileList.sort(new FileNameComparator().reversed());
-                order = " opadajuce ";
+            List<File> outputFiles = new ArrayList<>();
+            for(String outputPath: toReturn){
+                outputFiles.add(new File(outputPath));
             }
-
-            System.out.println("\nLista fajlova i foldera sortirana" + order + "po nazivu:");
-            System.out.println("-----------------------------------------------------\n");
-            for (File file : fileList) {
-                type = file.isDirectory() ? "DIR" : "FILE";
-                System.out.println(file.getName() + " --- " + file.length() / (1024 * 1024) + " MB " + " --- " + type);
+            if(operation == Operations.SORT_BY_NAME_ASC)
+                outputFiles.sort(new FileNameComparator());
+            else
+                outputFiles.sort(new FileNameComparator().reversed());
+            toReturn.clear();
+            for(File f : outputFiles){
+                if(f.isFile())
+                    toReturn.add(f.getName() + " --- " + f.length() / 1024 + " KB" + " --- " + "FILE");
+                else
+                    toReturn.add(f.getName() + " --- " + f.length() / 1024 + " KB" + " --- " + "DIR");
             }
         } else if (operation == Operations.SORT_BY_DATE_MODIFIED_ASC || operation == Operations.SORT_BY_DATE_MODIFIED_DESC) {
-            String order;
-            if(operation == Operations.SORT_BY_DATE_MODIFIED_ASC) {
-                fileList.sort(new FileModifiedDateComparator());
-                order = " rastuce ";
-            }
-            else {
-                fileList.sort(new FileModifiedDateComparator().reversed());
-                order = " opadajuce ";
+            if(searchSubdirectories) {
+                for (File file : fileList) {
+                    if(file.isFile()) {
+                        toReturn.add(file.getPath());
+                    } else {
+                        String fullPath = file.getPath();
+                        fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
+                        toReturn.add(file.getPath());
+                        toReturn = listRecursive(fullPath, null, operation, true, toReturn);
+                    }
+                }
+            } else {
+                for (File file : fileList) {
+                    if(file.isFile()){
+                        toReturn.add(file.getPath());
+                    } else {
+                        toReturn.add(file.getPath());
+                    }
+                }
             }
             SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
+            List<File> outputFiles = new ArrayList<>();
+            for(String outputPath: toReturn){
+                outputFiles.add(new File(outputPath));
+            }
+            if(operation == Operations.SORT_BY_DATE_MODIFIED_ASC)
+                outputFiles.sort(new FileModifiedDateComparator());
+            else
+                outputFiles.sort(new FileModifiedDateComparator().reversed());
+            toReturn.clear();
+            for(File f : outputFiles){
 
-            System.out.println("\nLista fajlova i foldera sortirana" + order + "po datumu izmene:");
-            System.out.println("-----------------------------------------------------\n");
-            for (File file : fileList) {
-
-                type = file.isDirectory() ? "DIR" : "FILE";
-                System.out.println(file.getName() + " --- " + file.length() / (1024 * 1024) + " MB" + " --- " + type + " --- " + sdf.format(file.lastModified()));
+                if(f.isFile())
+                    toReturn.add(f.getName() + " --- " + f.length() / 1024 + " KB" + " --- " + "FILE" + " --- " + sdf.format(f.lastModified()));
+                else
+                    toReturn.add(f.getName() + " --- " + f.length() / 1024 + " KB" + " --- " + "DIR" + " --- " + sdf.format(f.lastModified()));
             }
         }
+        return toReturn;
     }
 
     @Override
@@ -502,6 +581,7 @@ public class LocalFileStorageImplementation implements FileStorage {
             String password = scanner.nextLine();
 
             ObjectMapper objectMapper = new ObjectMapper();
+            objectMapper.enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
             List<User> users = new ArrayList<>();
             try {
                 users = Arrays.asList(objectMapper.readValue(new File(path + "/users.json"), User[].class));
@@ -546,8 +626,8 @@ public class LocalFileStorageImplementation implements FileStorage {
                 this.storageModelList.add(storageModel);
                 setCurrentStorage(storageModel);
             } else {
+                // TODO: ne treba println
                 System.out.println("Skladiste nije kreirano.");
-                return;
             }
         }
     }
@@ -570,7 +650,8 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
 
         // Dodavanje novog para direktorijum-brFajlova u HashMap trenutnog skladista
-        currentStorage.getMaxNumberOfFilesInDirectory().put(fullPath, Integer.valueOf(numberOfFiles));
+        //TODO: eventualno ce praviti problem - mozda mora Integer.valueOf u mapu, proveri
+        currentStorage.getMaxNumberOfFilesInDirectory().put(fullPath, numberOfFiles);
         currentStorage.setMaxNumberOfFilesInDirectorySet(true);
         currentStorage.updateConfig();
     }
@@ -699,10 +780,185 @@ public class LocalFileStorageImplementation implements FileStorage {
     private boolean checkExtensions(String filename){
         boolean found = false;
         for(String extension: currentStorage.getUnsupportedExtensions()){
-            if(filename.endsWith(extension))
+            if (filename.endsWith(extension)) {
                 found = true;
+                break;
+            }
         }
         return found;
+    }
+
+    private Collection<String> listRecursive(String path, boolean searchSubdirectories, Collection<String> toReturn) throws InsufficientPrivilegesException, FileNotFoundException {
+
+        String destinationPath = currentStorage.getRootDirectory() + "/" + path;
+
+        // Provera privilegija:
+        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.VIEW)){
+            throw new InsufficientPrivilegesException();
+        }
+
+        //TODO: Provera sta se desi ako se ne pronadje path - u DRIVEu moze kao file not found jer ja mogu bas da proverim postojanje patha
+        if(!new File(destinationPath).exists())
+            throw new FileNotFoundException();
+
+        // Uzimanje fajl liste u root-u:
+        List<File> fileList = getFileList(currentStorage.getRootDirectory() + "/" + path);
+
+        if(searchSubdirectories) {
+            for (File file : fileList) {
+                if(file.isFile()){
+                    toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                } else {
+                    String fullPath = file.getPath();
+                    fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
+                    toReturn = listRecursive(fullPath, true, toReturn);
+                }
+            }
+        } else {
+
+            // TODO!!!
+
+        }
+        return toReturn;
+    }
+
+    private Collection<String> listRecursive(String path, String argument, Operations operation, boolean searchSubdirectories, Collection<String> toReturn) throws InsufficientPrivilegesException, FileNotFoundException {
+
+        String destinationPath = currentStorage.getRootDirectory() + "/" + path;
+
+        // Provera privilegija:
+        if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.VIEW)){
+            throw new InsufficientPrivilegesException();
+        }
+
+        // Provera da li postoji fajl:
+        if(!new File(destinationPath).exists())
+            throw new FileNotFoundException();
+
+        List<File> fileList = getFileList(currentStorage.getRootDirectory() + "/" + path);
+
+        if (operation == Operations.FILTER_EXTENSION) {
+            String extension = argument;
+
+            if(searchSubdirectories) {
+                for (File file : fileList) {
+                    if(file.isFile()) {
+                        if (file.getName().endsWith(extension))
+                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                    } else {
+                        String fullPath = file.getPath();
+                        fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
+                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                        toReturn = listRecursive(fullPath, extension, Operations.FILTER_EXTENSION, true, toReturn);
+                    }
+                }
+            } else {
+                for (File file : fileList) {
+                    if(file.isFile()){
+                        if (file.getName().endsWith(extension))
+                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                    } else {
+                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                    }
+                }
+            }
+        } else if (operation == Operations.FILTER_FILENAME) {
+            String filename = argument;
+//            System.out.println("\nLista fajlova ciji nazivi sadrze dati tekst:");
+//            System.out.println("----------------------------------------------\n");
+            if(searchSubdirectories) {
+                for (File file : fileList) {
+                    if(file.isFile()) {
+                        if (file.getName().contains(filename))
+                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                    } else {
+                        String fullPath = file.getPath();
+                        fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
+                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                        toReturn = listRecursive(fullPath, filename, Operations.FILTER_FILENAME, true, toReturn);
+                    }
+                }
+            } else {
+                for (File file : fileList) {
+                    if(file.isFile()){
+                        if (file.getName().endsWith(filename))
+                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                    } else {
+                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                    }
+                }
+            }
+        } else if (operation == Operations.SORT_BY_NAME_ASC || operation == Operations.SORT_BY_NAME_DESC) {
+
+            if(searchSubdirectories) {
+                for (File file : fileList) {
+                    if(file.isFile()) {
+                        toReturn.add(file.getPath());
+                    } else {
+                        String fullPath = file.getPath();
+                        fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
+                        toReturn.add(file.getPath());
+                        toReturn = listRecursive(fullPath, null, operation, true, toReturn);
+                    }
+                }
+            } else {
+                for (File file : fileList) {
+                    if(file.isFile()){
+                        toReturn.add(file.getPath());
+                    } else {
+
+                        toReturn.add(file.getPath());
+                    }
+                }
+            }
+        } else if (operation == Operations.SORT_BY_DATE_MODIFIED_ASC || operation == Operations.SORT_BY_DATE_MODIFIED_DESC) {
+
+            if(operation == Operations.SORT_BY_DATE_MODIFIED_ASC) {
+                fileList.sort(new FileModifiedDateComparator());
+            }
+            else {
+                fileList.sort(new FileModifiedDateComparator().reversed());
+            }
+
+            if(searchSubdirectories) {
+                for (File file : fileList) {
+                    if(file.isFile()) {
+                        toReturn.add(file.getPath());
+                    } else {
+                        if(operation == Operations.SORT_BY_DATE_MODIFIED_DESC) {
+                            fileList = getFileList(file.getPath());
+                            fileList.sort(new FileModifiedDateComparator());
+                        }
+                        else {
+                            fileList = getFileList(file.getPath());
+                            fileList.sort(new FileModifiedDateComparator().reversed());
+                        }
+                        String fullPath = file.getPath();
+                        fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
+                        toReturn.add(file.getPath());
+                        toReturn = listRecursive(fullPath, null, operation, true, toReturn);
+                    }
+                }
+            } else {
+                for (File file : fileList) {
+                    if(file.isFile()){
+                        toReturn.add(file.getPath());
+                    } else {
+                        if(operation == Operations.SORT_BY_DATE_MODIFIED_DESC) {
+                            fileList = getFileList(file.getPath());
+                            fileList.sort(new FileModifiedDateComparator());
+                        }
+                        else {
+                            fileList = getFileList(file.getPath());
+                            fileList.sort(new FileModifiedDateComparator().reversed());
+                        }
+                        toReturn.add(file.getPath());
+                    }
+                }
+            }
+        }
+
+        return toReturn;
     }
 
     // Listanje fajlova u root direktorijumu:
