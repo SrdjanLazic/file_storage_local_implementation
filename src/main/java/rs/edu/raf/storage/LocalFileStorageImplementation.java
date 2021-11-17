@@ -32,6 +32,18 @@ public class LocalFileStorageImplementation implements FileStorage {
     @Override
     public void createFolder(String path, String ...folderNames) throws InsufficientPrivilegesException, FileNotFoundException {
 
+        String fullPath = currentStorage.getRootDirectory() + "/" + path;
+
+        // Provera privilegija na nivou foldera:
+        if (currentStorage.getFolderPrivileges().containsKey(fullPath)) {
+            if(!currentStorage.getFolderPrivileges().get(fullPath).contains(Privileges.CREATE))
+                throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
+        }
+
+        // Provera da li je trenutni korisnik null
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
+
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.CREATE)){
             throw new InsufficientPrivilegesException();
@@ -58,7 +70,7 @@ public class LocalFileStorageImplementation implements FileStorage {
                     folder.mkdir();
                 }
             } else {
-                String fullPath = currentStorage.getRootDirectory() + "/" + path + "/" + folderName;
+                fullPath = currentStorage.getRootDirectory() + "/" + path + "/" + folderName;
                 File newFolder = new File(fullPath);
                 newFolder.mkdir();
             }
@@ -70,6 +82,16 @@ public class LocalFileStorageImplementation implements FileStorage {
 
         String fullPath = currentStorage.getRootDirectory() + "/" + path;
         File destinationFolder = new File(fullPath);
+
+        // Provera privilegija na nivou foldera:
+        if (currentStorage.getFolderPrivileges().containsKey(fullPath)) {
+            if(!currentStorage.getFolderPrivileges().get(fullPath).contains(Privileges.CREATE))
+                throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
+        }
+
+        // Provera da li je trenutni korisnik null
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
 
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.CREATE)){
@@ -111,15 +133,39 @@ public class LocalFileStorageImplementation implements FileStorage {
     @Override
     public void createFolder(String folderName) {
 
+        // Provera da li je trenutni korisnik null
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
+
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.CREATE)){
             throw new InsufficientPrivilegesException();
         }
 
+        // Provera privilegija na nivou foldera:
         if (currentStorage.getFolderPrivileges().containsKey(currentStorage.getRootDirectory())) {
             if(!currentStorage.getFolderPrivileges().get(currentStorage.getRootDirectory()).contains(Privileges.CREATE))
                 throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
+
+        if (folderName.contains("{") && folderName.contains("}")) {
+            String folderNameBase;
+            int firstBrace = folderName.indexOf("{"), firstNum, secondNum;
+            folderNameBase = folderName.substring(0, firstBrace);
+            folderName = folderName.replaceAll("[^0-9]+", " ");
+            firstNum = Integer.parseInt(Arrays.asList(folderName.trim().split(" ")).get(0));
+            secondNum = Integer.parseInt(Arrays.asList(folderName.trim().split(" ")).get(1));
+
+            for (int i = firstNum; i <= secondNum; i++) {
+                File folder = new File(currentStorage.getRootDirectory() + "/" + folderNameBase + i);
+                folder.mkdir();
+            }
+        } else {
+            String fullPath = currentStorage.getRootDirectory() + "/" + folderName;
+            File newFolder = new File(fullPath);
+            newFolder.mkdir();
+        }
+
     }
 
 
@@ -129,9 +175,19 @@ public class LocalFileStorageImplementation implements FileStorage {
         String fullPath = currentStorage.getRootDirectory() + "/" + filename;
         File destinationFolder = currentStorage.getStorageFolder();
 
+        // Provera da li je trenutni korisnik null
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
+
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.CREATE)){
             throw new InsufficientPrivilegesException();
+        }
+
+        // Provera privilegija na nivou foldera:
+        if (currentStorage.getFolderPrivileges().containsKey(currentStorage.getRootDirectory())) {
+            if(!currentStorage.getFolderPrivileges().get(currentStorage.getRootDirectory()).contains(Privileges.CREATE))
+                throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
 
         // Provera da li je dozvoljena ekstenzija fajla:
@@ -157,8 +213,13 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
     }
 
+    // TODO: brisanje foldera sa sadrzajem
     @Override
     public void delete(String ...paths) throws FileNotFoundException, InsufficientPrivilegesException, FileDeleteFailedException {
+
+        // Provera da li je trenutni korisnik null
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
 
         // Provera da li trenutni korisnik skladista ima privilegiju za brisanje fajlova
         if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.DELETE)){
@@ -166,7 +227,15 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
 
         for(String path: paths) {
-            File file = new File(currentStorage.getRootDirectory() + "/" + path);
+            String fullPath = currentStorage.getRootDirectory() + "/" + path;
+            String pathWithoutFile = fullPath.substring(0, fullPath.lastIndexOf('/'));
+            File file = new File(fullPath);
+
+            // Provera privilegija na nivou foldera:
+            if (currentStorage.getFolderPrivileges().containsKey(pathWithoutFile)) {
+                if(!currentStorage.getFolderPrivileges().get(pathWithoutFile).contains(Privileges.DELETE))
+                    throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
+            }
 
             // Provera da li postoji fajl na prosledjenoj putanji:
             if (!file.exists()) {
@@ -187,9 +256,20 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void get(String ...paths) {
+
+        // Provera da li je trenutni korisnik null
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
+
         // Provera privilegija:
         if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.DOWNLOAD)){
             throw new InsufficientPrivilegesException();
+        }
+
+        // Provera privilegija na nivou foldera:
+        if (currentStorage.getFolderPrivileges().containsKey(currentStorage.getDownloadFolder())) {
+            if(!currentStorage.getFolderPrivileges().get(currentStorage.getDownloadFolder()).contains(Privileges.DOWNLOAD))
+                throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
 
         for(String path: paths) {
@@ -205,9 +285,19 @@ public class LocalFileStorageImplementation implements FileStorage {
         String fullPath = currentStorage.getRootDirectory() + "/" + destination;
         File destinationFolder = new File(fullPath);
 
+        // Provera da li je trenutni korisnik null
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
+
         // Provera privilegija:
         if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.CREATE)){
             throw new InsufficientPrivilegesException();
+        }
+
+        // Provera privilegija na nivou foldera:
+        if (currentStorage.getFolderPrivileges().containsKey(fullPath)) {
+            if(!currentStorage.getFolderPrivileges().get(fullPath).contains(Privileges.CREATE))
+                throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
 
         // Provera da li postoji destination:
@@ -217,11 +307,15 @@ public class LocalFileStorageImplementation implements FileStorage {
         // Provera prekoracenja broja fajlova u folderu:
         if(currentStorage.getMaxNumberOfFilesInDirectory().containsKey(fullPath)){
             int numberOfFiles = destinationFolder.listFiles().length;
-            if(numberOfFiles + sources.length > currentStorage.getMaxNumberOfFilesInDirectory().get(destination))
+            if(numberOfFiles + sources.length > currentStorage.getMaxNumberOfFilesInDirectory().get(fullPath))
                 throw new FileLimitExceededException();
         }
 
         for(String source: sources) {
+
+            // Provera da li se fajl nalazi van skladista (move radi samo premestanje u okviru skladista)
+            if(!source.contains(currentStorage.getRootDirectory()))
+                throw new FileNotInStorageException();
 
             source = currentStorage.getRootDirectory() + "/" + source;
             File sourceFile = new File(source);
@@ -270,9 +364,19 @@ public class LocalFileStorageImplementation implements FileStorage {
         String fullPath = currentStorage.getRootDirectory() + "/" + destination;
         File destinationFolder = new File(fullPath);
 
+        // Provera da li je trenutni korisnik null
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
+
         // Provera privilegija:
         if(!getCurrentStorage().getCurrentUser().getPrivileges().contains(Privileges.CREATE)){
             throw new InsufficientPrivilegesException();
+        }
+
+        // Provera privilegija na nivou foldera:
+        if (currentStorage.getFolderPrivileges().containsKey(fullPath)) {
+            if(!currentStorage.getFolderPrivileges().get(fullPath).contains(Privileges.CREATE))
+                throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
 
         // Provera da li postoji destinacija
@@ -281,11 +385,17 @@ public class LocalFileStorageImplementation implements FileStorage {
 
         for(String source: sources) {
             // Provera prekoracenja broja fajlova u folderu:
-            if(currentStorage.getMaxNumberOfFilesInDirectory().containsKey(destination)){
-                int numberOfFiles = destinationFolder.getParentFile().listFiles().length;
-                if(numberOfFiles + sources.length > currentStorage.getMaxNumberOfFilesInDirectory().get(destination))
+            if(currentStorage.getMaxNumberOfFilesInDirectory().containsKey(fullPath)){
+                int numberOfFiles = destinationFolder.listFiles().length;
+                System.out.println(numberOfFiles);
+                if(numberOfFiles + sources.length > currentStorage.getMaxNumberOfFilesInDirectory().get(fullPath))
                     throw new FileLimitExceededException();
+
             }
+
+            // Provera da li postoji source fajl
+            if(!new File(source).exists())
+                throw new FileNotFoundException();
 
             Path sourcePath = Paths.get(source);
 
@@ -294,12 +404,11 @@ public class LocalFileStorageImplementation implements FileStorage {
                 throw new FileAlreadyInStorageException();
             }
 
-
+            // TODO: ovo proveri na svim mestima, da li je setovan uopste limit
             // Provera prekoracenja velicine skladista u bajtovima:
-
             try {
                 long size = Files.size(sourcePath);
-                if (currentStorage.getCurrentStorageSize() + size > currentStorage.getStorageSizeLimit()) {
+                if (currentStorage.isStorageSizeLimitSet() && (currentStorage.getCurrentStorageSize() + size > currentStorage.getStorageSizeLimit())) {
                     throw new StorageSizeExceededException();
                 }
             } catch (IOException e) {
@@ -311,11 +420,10 @@ public class LocalFileStorageImplementation implements FileStorage {
                 throw new InvalidExtensionException();
             }
 
-
             Path result = null;
 
             try {
-                result = Files.copy(sourcePath, Paths.get(currentStorage.getRootDirectory() + "/" + destination), StandardCopyOption.COPY_ATTRIBUTES);
+                result = Files.copy(sourcePath, Paths.get(currentStorage.getRootDirectory() + "/" + destination + "/" + sourcePath.getFileName()), StandardCopyOption.COPY_ATTRIBUTES);
                 currentStorage.setCurrentStorageSize(currentStorage.getCurrentStorageSize() + Files.size(sourcePath));
                 currentStorage.updateConfig();
             } catch (IOException e1) {
@@ -334,9 +442,19 @@ public class LocalFileStorageImplementation implements FileStorage {
 
         Collection<String> toReturn = new ArrayList<>();
 
+        // Provera da li je trenutni korisnik null
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
+
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.VIEW)){
             throw new InsufficientPrivilegesException();
+        }
+
+        // Provera privilegija na nivou foldera:
+        if (currentStorage.getFolderPrivileges().containsKey(destinationPath)) {
+            if(!currentStorage.getFolderPrivileges().get(destinationPath).contains(Privileges.VIEW))
+                throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
 
         // Provera da li putanja postoji:
@@ -379,9 +497,19 @@ public class LocalFileStorageImplementation implements FileStorage {
 
         Collection<String> toReturn = new ArrayList<>();
 
+        // Provera da li je trenutni korisnik null
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
+
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.VIEW)){
             throw new InsufficientPrivilegesException();
+        }
+
+        // Provera privilegija na nivou foldera:
+        if (currentStorage.getFolderPrivileges().containsKey(destinationPath)) {
+            if(!currentStorage.getFolderPrivileges().get(destinationPath).contains(Privileges.VIEW))
+                throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
 
         // Provera da li postoji fajl:
@@ -602,6 +730,10 @@ public class LocalFileStorageImplementation implements FileStorage {
 
         String fullPath = getCurrentStorage().getRootDirectory() + "/" + path;
 
+        // Provera da li je trenutni korisnik null
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
+
         // Provera da li konfiguraciju vrsi superuser:
         if(!currentStorage.getSuperuser().equals(currentStorage.getCurrentUser())){
             throw new InsufficientPrivilegesException();
@@ -624,6 +756,10 @@ public class LocalFileStorageImplementation implements FileStorage {
     @Override
     public void limitStorageSize(long l) throws InsufficientPrivilegesException {
 
+        // Provera da li je trenutni korisnik null
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
+
         // Provera da li konfiguraciju vrsi superuser:
         if(!currentStorage.getSuperuser().equals(currentStorage.getCurrentUser())){
             throw new InsufficientPrivilegesException();
@@ -636,6 +772,10 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public void restrictExtension(String extension) throws InsufficientPrivilegesException {
+
+        // Provera da li je trenutni korisnik null
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
 
         // Provera da li konfiguraciju vrsi superuser:
         if(!currentStorage.getSuperuser().equals(currentStorage.getCurrentUser())){
@@ -699,6 +839,9 @@ public class LocalFileStorageImplementation implements FileStorage {
 
         User findUser = null;
 
+        if(!(currentStorage.getCurrentUser() == null))
+            throw new UserAlreadyLoggedInException();
+
         // Prodji kroz sve usere:
         for(User u: currentStorage.getUserList()){
             if(u.equals(user))
@@ -708,7 +851,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         if(findUser == null)
             throw new UserNotFoundException();
 
-        if(currentStorage.getCurrentUser().equals(findUser))
+        if(!(currentStorage.getCurrentUser() == null) && currentStorage.getCurrentUser().equals(findUser))
             throw new UserAlreadyLoggedInException();
 
         currentStorage.setCurrentUser(findUser);
@@ -741,6 +884,10 @@ public class LocalFileStorageImplementation implements FileStorage {
     @Override
     public void setFolderPrivileges(String path, Set<Privileges> privileges) {
         String fullPath = currentStorage.getRootDirectory() + "/" + path;
+
+        // Provera da li je trenutni korisnik null
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
 
         // Provera da li konfiguraciju vrsi superuser:
         if(!currentStorage.getSuperuser().equals(currentStorage.getCurrentUser())){
