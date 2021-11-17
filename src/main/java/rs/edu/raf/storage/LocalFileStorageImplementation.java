@@ -18,8 +18,6 @@ import java.nio.file.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-// TODO: privilegija za neki folder, svuda dodaj provere na pocetku metoda!
-
 public class LocalFileStorageImplementation implements FileStorage {
 
     static {
@@ -35,8 +33,8 @@ public class LocalFileStorageImplementation implements FileStorage {
         String fullPath = currentStorage.getRootDirectory() + "/" + path;
 
         // Provera privilegija na nivou foldera:
-        if (currentStorage.getFolderPrivileges().containsKey(fullPath)) {
-            if(!currentStorage.getFolderPrivileges().get(fullPath).contains(Privileges.CREATE))
+        if (currentStorage.getCurrentUser().getFolderPrivileges().containsKey(fullPath)) {
+            if(!currentStorage.getCurrentUser().getFolderPrivileges().get(fullPath).contains(Privileges.CREATE))
                 throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
 
@@ -84,8 +82,8 @@ public class LocalFileStorageImplementation implements FileStorage {
         File destinationFolder = new File(fullPath);
 
         // Provera privilegija na nivou foldera:
-        if (currentStorage.getFolderPrivileges().containsKey(fullPath)) {
-            if(!currentStorage.getFolderPrivileges().get(fullPath).contains(Privileges.CREATE))
+        if (currentStorage.getCurrentUser().getFolderPrivileges().containsKey(fullPath)) {
+            if(!currentStorage.getCurrentUser().getFolderPrivileges().get(fullPath).contains(Privileges.CREATE))
                 throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
 
@@ -111,6 +109,7 @@ public class LocalFileStorageImplementation implements FileStorage {
                 throw new FileLimitExceededException();
         }
         for(String filename: filenames) {
+
             // Provera da li prosledjeni fajl ima ekstenziju koja nije dozvoljena:
             if (checkExtensions(filename)) {
                 throw new InvalidExtensionException();
@@ -143,8 +142,8 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
 
         // Provera privilegija na nivou foldera:
-        if (currentStorage.getFolderPrivileges().containsKey(currentStorage.getRootDirectory())) {
-            if(!currentStorage.getFolderPrivileges().get(currentStorage.getRootDirectory()).contains(Privileges.CREATE))
+        if (currentStorage.getCurrentUser().getFolderPrivileges().containsKey(currentStorage.getRootDirectory())) {
+            if(!currentStorage.getCurrentUser().getFolderPrivileges().get(currentStorage.getRootDirectory()).contains(Privileges.CREATE))
                 throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
 
@@ -185,8 +184,8 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
 
         // Provera privilegija na nivou foldera:
-        if (currentStorage.getFolderPrivileges().containsKey(currentStorage.getRootDirectory())) {
-            if(!currentStorage.getFolderPrivileges().get(currentStorage.getRootDirectory()).contains(Privileges.CREATE))
+        if (currentStorage.getCurrentUser().getFolderPrivileges().containsKey(currentStorage.getRootDirectory())) {
+            if(!currentStorage.getCurrentUser().getFolderPrivileges().get(currentStorage.getRootDirectory()).contains(Privileges.CREATE))
                 throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
 
@@ -213,7 +212,6 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
     }
 
-    // TODO: brisanje foldera sa sadrzajem
     @Override
     public void delete(String ...paths) throws FileNotFoundException, InsufficientPrivilegesException, FileDeleteFailedException {
 
@@ -232,8 +230,8 @@ public class LocalFileStorageImplementation implements FileStorage {
             File file = new File(fullPath);
 
             // Provera privilegija na nivou foldera:
-            if (currentStorage.getFolderPrivileges().containsKey(pathWithoutFile)) {
-                if(!currentStorage.getFolderPrivileges().get(pathWithoutFile).contains(Privileges.DELETE))
+            if (currentStorage.getCurrentUser().getFolderPrivileges().containsKey(pathWithoutFile)) {
+                if(!currentStorage.getCurrentUser().getFolderPrivileges().get(pathWithoutFile).contains(Privileges.DELETE))
                     throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
             }
 
@@ -242,15 +240,30 @@ public class LocalFileStorageImplementation implements FileStorage {
                 throw new FileNotFoundException();
             }
 
-            // Brisanje fajla:
-            boolean deleted = file.delete();
+            if(file.isDirectory()){
+                for(File f : file.listFiles()){
+                    delete(f.getPath().replace("\\","/").replace(currentStorage.getRootDirectory(),""));
+                }
+                file.delete();
+            } else {
+                boolean deleted = file.delete();
 
-            if (deleted) {
+                if (deleted) {
                 currentStorage.setCurrentStorageSize(currentStorage.getCurrentStorageSize() - file.length());
                 currentStorage.updateConfig();
+                }
+                else
+                    throw new FileDeleteFailedException();
             }
-            else
-                throw new FileDeleteFailedException();
+//            // Brisanje fajla:
+//            boolean deleted = file.delete();
+//
+//            if (deleted) {
+//                currentStorage.setCurrentStorageSize(currentStorage.getCurrentStorageSize() - file.length());
+//                currentStorage.updateConfig();
+//            }
+//            else
+//                throw new FileDeleteFailedException();
         }
     }
 
@@ -267,8 +280,8 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
 
         // Provera privilegija na nivou foldera:
-        if (currentStorage.getFolderPrivileges().containsKey(currentStorage.getDownloadFolder())) {
-            if(!currentStorage.getFolderPrivileges().get(currentStorage.getDownloadFolder()).contains(Privileges.DOWNLOAD))
+        if (currentStorage.getCurrentUser().getFolderPrivileges().containsKey(currentStorage.getDownloadFolder())) {
+            if(!currentStorage.getCurrentUser().getFolderPrivileges().get(currentStorage.getDownloadFolder()).contains(Privileges.DOWNLOAD))
                 throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
 
@@ -295,8 +308,8 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
 
         // Provera privilegija na nivou foldera:
-        if (currentStorage.getFolderPrivileges().containsKey(fullPath)) {
-            if(!currentStorage.getFolderPrivileges().get(fullPath).contains(Privileges.CREATE))
+        if (currentStorage.getCurrentUser().getFolderPrivileges().containsKey(fullPath)) {
+            if(!currentStorage.getCurrentUser().getFolderPrivileges().get(fullPath).contains(Privileges.CREATE))
                 throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
 
@@ -313,11 +326,8 @@ public class LocalFileStorageImplementation implements FileStorage {
 
         for(String source: sources) {
 
-            // Provera da li se fajl nalazi van skladista (move radi samo premestanje u okviru skladista)
-            if(!source.contains(currentStorage.getRootDirectory()))
-                throw new FileNotInStorageException();
-
             source = currentStorage.getRootDirectory() + "/" + source;
+            System.out.println(source);
             File sourceFile = new File(source);
 
             // Provera da li postoji fajl na prosledjenoj putanji:
@@ -325,28 +335,11 @@ public class LocalFileStorageImplementation implements FileStorage {
                 throw new FileNotFoundException();
             }
 
-            // Provera da li je dozvoljena ekstenzija fajla:
-            if (checkExtensions(source)) {
-                throw new InvalidExtensionException();
-            }
-
-            // Provera prekoracenja velicine skladista u bajtovima:
-            Path sourcePath = Paths.get(source);
-            try {
-                long size = Files.size(sourcePath);
-                if (currentStorage.isStorageSizeLimitSet() && (currentStorage.getCurrentStorageSize() + size > currentStorage.getStorageSizeLimit())) {
-                    throw new StorageSizeExceededException();
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
             Path result = null;
 
             try {
-                result = Files.move(Paths.get(source), Paths.get(currentStorage.getRootDirectory() + "/" + destination + "/" + Paths.get(source).getFileName()), StandardCopyOption.REPLACE_EXISTING);
-                currentStorage.setCurrentStorageSize(currentStorage.getCurrentStorageSize() + Files.size(sourcePath));
-                currentStorage.updateConfig();
+                String resultingPath = currentStorage.getRootDirectory() + "/" + destination + "/" + Paths.get(source).getFileName();
+                result = Files.move(Paths.get(source), Paths.get(resultingPath), StandardCopyOption.REPLACE_EXISTING);
             } catch (NoSuchFileException e1) {
                 e1.printStackTrace();
                 return;
@@ -374,8 +367,8 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
 
         // Provera privilegija na nivou foldera:
-        if (currentStorage.getFolderPrivileges().containsKey(fullPath)) {
-            if(!currentStorage.getFolderPrivileges().get(fullPath).contains(Privileges.CREATE))
+        if (currentStorage.getCurrentUser().getFolderPrivileges().containsKey(fullPath)) {
+            if(!currentStorage.getCurrentUser().getFolderPrivileges().get(fullPath).contains(Privileges.CREATE))
                 throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
 
@@ -404,7 +397,6 @@ public class LocalFileStorageImplementation implements FileStorage {
                 throw new FileAlreadyInStorageException();
             }
 
-            // TODO: ovo proveri na svim mestima, da li je setovan uopste limit
             // Provera prekoracenja velicine skladista u bajtovima:
             try {
                 long size = Files.size(sourcePath);
@@ -423,7 +415,7 @@ public class LocalFileStorageImplementation implements FileStorage {
             Path result = null;
 
             try {
-                result = Files.copy(sourcePath, Paths.get(currentStorage.getRootDirectory() + "/" + destination + "/" + sourcePath.getFileName()), StandardCopyOption.COPY_ATTRIBUTES);
+                result = Files.copy(sourcePath, Paths.get(currentStorage.getRootDirectory() + "/" + destination + "/" + sourcePath.getFileName()), StandardCopyOption.REPLACE_EXISTING);
                 currentStorage.setCurrentStorageSize(currentStorage.getCurrentStorageSize() + Files.size(sourcePath));
                 currentStorage.updateConfig();
             } catch (IOException e1) {
@@ -437,8 +429,11 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     @Override
     public Collection<String> list(String path, boolean searchSubdirectories) throws InsufficientPrivilegesException, FileNotFoundException {
-
-        String destinationPath = currentStorage.getRootDirectory() + "/" + path;
+        String destinationPath;
+        if(path.equalsIgnoreCase("root"))
+            destinationPath = currentStorage.getRootDirectory();
+        else
+            destinationPath = currentStorage.getRootDirectory() + "/" + path;
 
         Collection<String> toReturn = new ArrayList<>();
 
@@ -452,8 +447,8 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
 
         // Provera privilegija na nivou foldera:
-        if (currentStorage.getFolderPrivileges().containsKey(destinationPath)) {
-            if(!currentStorage.getFolderPrivileges().get(destinationPath).contains(Privileges.VIEW))
+        if (currentStorage.getCurrentUser().getFolderPrivileges().containsKey(destinationPath)) {
+            if(!currentStorage.getCurrentUser().getFolderPrivileges().get(destinationPath).contains(Privileges.VIEW))
                 throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
 
@@ -467,20 +462,20 @@ public class LocalFileStorageImplementation implements FileStorage {
         if(searchSubdirectories) {
             for (File file : fileList) {
                 if(file.isFile()){
-                    toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                    toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
                 } else {
                     String fullPath = file.getPath();
                     fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
-                    toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                    toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
                     toReturn = listRecursive(fullPath, true, toReturn);
                 }
             }
         } else {
             for (File file : fileList) {
                 if(file.isFile()){
-                    toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                    toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
                 } else {
-                    toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                    toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
                 }
             }
         }
@@ -489,11 +484,14 @@ public class LocalFileStorageImplementation implements FileStorage {
 
 
     // TODO: ne sme ispis!!!
-    // TODO: srediti sortiranje
     @Override
     public Collection<String> list(String path, String argument, Operations operation, boolean searchSubdirectories) throws InsufficientPrivilegesException, FileNotFoundException {
 
-        String destinationPath = currentStorage.getRootDirectory() + "/" + path;
+        String destinationPath;
+        if(path.equalsIgnoreCase("root"))
+            destinationPath = currentStorage.getRootDirectory();
+        else
+            destinationPath = currentStorage.getRootDirectory() + "/" + path;
 
         Collection<String> toReturn = new ArrayList<>();
 
@@ -507,8 +505,8 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
 
         // Provera privilegija na nivou foldera:
-        if (currentStorage.getFolderPrivileges().containsKey(destinationPath)) {
-            if(!currentStorage.getFolderPrivileges().get(destinationPath).contains(Privileges.VIEW))
+        if (currentStorage.getCurrentUser().getFolderPrivileges().containsKey(destinationPath)) {
+            if(!currentStorage.getCurrentUser().getFolderPrivileges().get(destinationPath).contains(Privileges.VIEW))
                 throw new InsufficientPrivilegesException("Greska! Folder nema potrebne privilegije.");
         }
 
@@ -516,7 +514,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         if(!new File(destinationPath).exists())
             throw new FileNotFoundException();
 
-        List<File> fileList = getFileList(currentStorage.getRootDirectory() + "/" + path);
+        List<File> fileList = getFileList(destinationPath);
 
         if (operation == Operations.FILTER_EXTENSION) {
             String extension = argument;
@@ -525,11 +523,10 @@ public class LocalFileStorageImplementation implements FileStorage {
                 for (File file : fileList) {
                     if(file.isFile()) {
                         if (file.getName().endsWith(extension))
-                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                            toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
                     } else {
                         String fullPath = file.getPath();
                         fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
-                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
                         toReturn = listRecursive(fullPath, extension, Operations.FILTER_EXTENSION, true, toReturn);
                     }
                 }
@@ -537,10 +534,9 @@ public class LocalFileStorageImplementation implements FileStorage {
                 for (File file : fileList) {
                     if(file.isFile()){
                         if (file.getName().endsWith(extension))
-                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
-                    } else {
-                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
-                    }
+                            toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                    }  //toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+
                 }
             }
         } else if (operation == Operations.FILTER_FILENAME) {
@@ -549,21 +545,18 @@ public class LocalFileStorageImplementation implements FileStorage {
                 for (File file : fileList) {
                     if(file.isFile()) {
                         if (file.getName().contains(filename))
-                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                            toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
                     } else {
                         String fullPath = file.getPath();
                         fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
-                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
                         toReturn = listRecursive(fullPath, filename, Operations.FILTER_FILENAME, true, toReturn);
                     }
                 }
             } else {
                 for (File file : fileList) {
                     if(file.isFile()){
-                        if (file.getName().endsWith(filename))
-                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
-                    } else {
-                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                        if (file.getName().contains(filename))
+                            toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
                     }
                 }
             }
@@ -599,9 +592,9 @@ public class LocalFileStorageImplementation implements FileStorage {
             toReturn.clear();
             for(File f : outputFiles){
                 if(f.isFile())
-                    toReturn.add(f.getName() + " --- " + f.length() / 1024 + " KB" + " --- " + "FILE");
+                    toReturn.add(f.getName() + " --- " + f.getPath() + " --- " + f.length() / 1024 + " KB" + " --- " + "FILE");
                 else
-                    toReturn.add(f.getName() + " --- " + f.length() / 1024 + " KB" + " --- " + "DIR");
+                    toReturn.add(f.getName() + " --- " + f.getPath() + " --- " + f.length() / 1024 + " KB" + " --- " + "DIR");
             }
         } else if (operation == Operations.SORT_BY_DATE_MODIFIED_ASC || operation == Operations.SORT_BY_DATE_MODIFIED_DESC) {
             if(searchSubdirectories) {
@@ -637,9 +630,9 @@ public class LocalFileStorageImplementation implements FileStorage {
             for(File f : outputFiles){
 
                 if(f.isFile())
-                    toReturn.add(f.getName() + " --- " + f.length() / 1024 + " KB" + " --- " + "FILE" + " --- " + sdf.format(f.lastModified()));
+                    toReturn.add(f.getName() + " --- " + f.getPath() + " --- " + f.length() / 1024 + " KB" + " --- " + "FILE" + " --- " + sdf.format(f.lastModified()));
                 else
-                    toReturn.add(f.getName() + " --- " + f.length() / 1024 + " KB" + " --- " + "DIR" + " --- " + sdf.format(f.lastModified()));
+                    toReturn.add(f.getName() + " --- " + f.getPath() + " --- " + f.length() / 1024 + " KB" + " --- " + "DIR" + " --- " + sdf.format(f.lastModified()));
             }
         }
         return toReturn;
@@ -747,7 +740,6 @@ public class LocalFileStorageImplementation implements FileStorage {
         }
 
         // Dodavanje novog para direktorijum-brFajlova u HashMap trenutnog skladista
-        //TODO: eventualno ce praviti problem - mozda mora Integer.valueOf u mapu, proveri
         currentStorage.getMaxNumberOfFilesInDirectory().put(fullPath, numberOfFiles);
         currentStorage.setMaxNumberOfFilesInDirectorySet(true);
         currentStorage.updateConfig();
@@ -787,7 +779,13 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
     @Override
-    public void addNewUser(User user, Set<Privileges> privilegesSet) {
+    public void addNewUser(String username, String password, Set<Privileges> privilegesSet) {
+
+        User user = new User(username, password);
+
+        // Provera da li je trenutni korisnik null
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
 
         // Provera da li konfiguraciju vrsi superuser:
         if(!currentStorage.getSuperuser().equals(currentStorage.getCurrentUser())){
@@ -806,7 +804,7 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
     @Override
-    public void removeUser(User user) throws UserNotFoundException {
+    public void removeUser(String username) throws UserNotFoundException {
 
         // Provera da li konfiguraciju vrsi superuser:
         if(!currentStorage.getSuperuser().equals(currentStorage.getCurrentUser())){
@@ -817,7 +815,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         User toRemove = null;
         boolean found = false;
         for(User u: currentStorage.getUserList()){
-            if(u.getUsername().equalsIgnoreCase(user.getUsername()) && u.getPassword().equalsIgnoreCase(user.getPassword())){
+            if(u.getUsername().equalsIgnoreCase(username)){
                 found = true;
                 toRemove = u;
             }
@@ -833,14 +831,14 @@ public class LocalFileStorageImplementation implements FileStorage {
             throw new UserNotFoundException();
     }
 
-    // TODO: istestirati
     @Override
-    public void login(User user) throws UserNotFoundException, UserAlreadyLoggedInException{
+    public void login(String username, String password) throws UserNotFoundException, UserAlreadyLoggedInException{
 
+        User user = new User(username, password);
         User findUser = null;
 
         if(!(currentStorage.getCurrentUser() == null))
-            throw new UserAlreadyLoggedInException();
+            throw new CurrentUserIsNullException();
 
         // Prodji kroz sve usere:
         for(User u: currentStorage.getUserList()){
@@ -861,20 +859,10 @@ public class LocalFileStorageImplementation implements FileStorage {
 
     // TODO: kod svih operacija sa skladistem uraditi proveru, ako je currentUser == null -> nijedan korisnik nije logovan, ne moze da se izvrsi
     @Override
-    public void logout(User user) throws UserNotFoundException, UserLogoutException{
-        User findUser = null;
+    public void logout() throws UserNotFoundException, UserLogoutException{
 
-        // Prodji kroz sve usere:
-        for(User u: currentStorage.getUserList()){
-            if(u.equals(user))
-                findUser = u;
-        }
-
-        if(findUser == null)
-            throw new UserNotFoundException();
-
-        if(!currentStorage.getCurrentUser().equals(findUser))
-            throw new UserLogoutException();
+        if(currentStorage.getCurrentUser() == null)
+            throw new CurrentUserIsNullException();
 
         currentStorage.setCurrentUser(null);
         currentStorage.updateUsers();
@@ -882,7 +870,7 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
     @Override
-    public void setFolderPrivileges(String path, Set<Privileges> privileges) {
+    public void setFolderPrivileges(String username, String path, Set<Privileges> privileges) {
         String fullPath = currentStorage.getRootDirectory() + "/" + path;
 
         // Provera da li je trenutni korisnik null
@@ -893,6 +881,15 @@ public class LocalFileStorageImplementation implements FileStorage {
         if(!currentStorage.getSuperuser().equals(currentStorage.getCurrentUser())){
             throw new InsufficientPrivilegesException();
         }
+
+        User user = null;
+        for(User u : currentStorage.getUserList()){
+            if(u.getUsername().equalsIgnoreCase(username))
+                user = u;
+        }
+
+        if(user == null)
+            throw new UserNotFoundException();
 
         Set<Privileges> privilegesToAdd = new HashSet<>();
 
@@ -905,7 +902,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         else if(privileges.contains(Privileges.VIEW))
             privilegesToAdd.add((Privileges.VIEW));
 
-        currentStorage.getFolderPrivileges().put(fullPath,privilegesToAdd);
+        user.getFolderPrivileges().put(fullPath, privilegesToAdd);
     }
 
 
@@ -943,7 +940,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         if(searchSubdirectories) {
             for (File file : fileList) {
                 if(file.isFile()){
-                    toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                    toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
                 } else {
                     String fullPath = file.getPath();
                     fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
@@ -953,9 +950,9 @@ public class LocalFileStorageImplementation implements FileStorage {
         } else {
             for (File file : fileList) {
                 if(file.isFile())
-                    toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                    toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
                 else
-                    toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                    toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
             }
         }
         return toReturn;
@@ -983,11 +980,11 @@ public class LocalFileStorageImplementation implements FileStorage {
                 for (File file : fileList) {
                     if(file.isFile()) {
                         if (file.getName().endsWith(extension))
-                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                            toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
                     } else {
                         String fullPath = file.getPath();
                         fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
-                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                        //toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
                         toReturn = listRecursive(fullPath, extension, Operations.FILTER_EXTENSION, true, toReturn);
                     }
                 }
@@ -995,9 +992,9 @@ public class LocalFileStorageImplementation implements FileStorage {
                 for (File file : fileList) {
                     if(file.isFile()){
                         if (file.getName().endsWith(extension))
-                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                            toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
                     } else {
-                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                        //toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
                     }
                 }
             }
@@ -1008,21 +1005,18 @@ public class LocalFileStorageImplementation implements FileStorage {
                 for (File file : fileList) {
                     if(file.isFile()) {
                         if (file.getName().contains(filename))
-                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
+                            toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
                     } else {
                         String fullPath = file.getPath();
                         fullPath = fullPath.replace("\\", "/").replace(currentStorage.getRootDirectory(), "");
-                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
                         toReturn = listRecursive(fullPath, filename, Operations.FILTER_FILENAME, true, toReturn);
                     }
                 }
             } else {
                 for (File file : fileList) {
                     if(file.isFile()){
-                        if (file.getName().endsWith(filename))
-                            toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
-                    } else {
-                        toReturn.add(file.getName() + " --- " + file.length() / 1024 + " KB" + " --- " + "DIR");
+                        if (file.getName().contains(filename))
+                            toReturn.add(file.getName() + " --- " + file.getPath() + " --- " + file.length() / 1024 + " KB" + " --- " + "FILE");
                     }
                 }
             }

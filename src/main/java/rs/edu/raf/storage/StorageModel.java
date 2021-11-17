@@ -10,7 +10,6 @@ import java.util.*;
 
 public class StorageModel {
 
-    //TODO: privilegije za foldere
     private String usersJSON;
     private String configJSON;
     private File storageFolder;
@@ -25,12 +24,6 @@ public class StorageModel {
     private List<User> userList = new ArrayList<>();
     private List<String> unsupportedExtensions = new ArrayList<>();
     private Map<String, Integer> maxNumberOfFilesInDirectory = new HashMap<>();
-    // TODO:
-    // D:/storage/folder1 : {DELETE, CREATE, VIEW}
-    // folder2 : {VIEW}
-    // if(!currentStorage.getFolderPrivileges.get(folderName).contains(Privileges.VIEW))
-        // throw new InsufficientPrivilegesException();
-    private Map<String, Set<Privileges>> folderPrivileges = new HashMap<>();
     private ObjectMapper mapper = new ObjectMapper();
 
     public StorageModel(){
@@ -218,12 +211,5 @@ public class StorageModel {
         this.storageSizeLimitSet = storageSizeLimitSet;
     }
 
-    public Map<String, Set<Privileges>> getFolderPrivileges() {
-        return folderPrivileges;
-    }
-
-    public void setFolderPrivileges(Map<String, Set<Privileges>> folderPrivileges) {
-        this.folderPrivileges = folderPrivileges;
-    }
 }
 
