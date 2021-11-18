@@ -91,6 +91,8 @@ public class LocalFileStorageImplementation implements FileStorage {
         if(currentStorage.getCurrentUser() == null)
             throw new CurrentUserIsNullException();
 
+        System.out.println("Trenutni user " + currentStorage.getCurrentUser());
+        System.out.println("Privilegije " + currentStorage.getCurrentUser().getPrivileges());
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.CREATE)){
             throw new InsufficientPrivilegesException();
@@ -178,6 +180,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         if(currentStorage.getCurrentUser() == null)
             throw new CurrentUserIsNullException();
 
+        System.out.println(currentStorage.getCurrentUser());
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.CREATE)){
             throw new InsufficientPrivilegesException();
@@ -639,7 +642,9 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
     @Override
-    public void initializeStorage(String path) throws UserNotFoundException {
+    public void initializeStorage(String path, String username, String password) throws UserNotFoundException {
+
+        User user = new User(username, password);
 
         boolean isStorage = false;
         Scanner scanner = new Scanner(System.in);
@@ -655,14 +660,8 @@ public class LocalFileStorageImplementation implements FileStorage {
             }
         }
 
-        // TODO: ispis ne bi trebalo da bude ovde!
         // Ako jeste skladiste, procitaj user i config fajlove
         if(isStorage){
-            System.out.println("Direktorijum je vec skladiste. Unesite username i password kako biste se konektovali na skladiste.");
-            System.out.println("Username:");
-            String username = scanner.nextLine();
-            System.out.println("Password:");
-            String password = scanner.nextLine();
 
             ObjectMapper objectMapper = new ObjectMapper();
             objectMapper.enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
@@ -675,17 +674,16 @@ public class LocalFileStorageImplementation implements FileStorage {
 
             boolean found = false;
 
-            // TODO: provera kredencijala preko equals za Usera
             // Provera kredencijala - uporedjivanje prosledjenih username i password-a i procitanih iz users.json fajla
-            for(User user: users) {
-                if (username.equalsIgnoreCase(user.getUsername()) && password.equalsIgnoreCase(user.getPassword())) {
+            for(User u: users) {
+                if (u.getUsername().equalsIgnoreCase(user.getUsername()) && u.getPassword().equalsIgnoreCase(user.getPassword())) {
                     found = true;
                     try {
                         // Ako se podaci User-a match-uju, procitaj config, setuj trenutni storage i dodaj skladiste u listu skladista
                         StorageModel storageModel = objectMapper.readValue(new File(path + "/config.json"), StorageModel.class);
                         storageModelList.add(storageModel);
                         setCurrentStorage(storageModel);
-                        currentStorage.setCurrentUser(user);
+                        currentStorage.setCurrentUser(u);
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -694,27 +692,12 @@ public class LocalFileStorageImplementation implements FileStorage {
             if(!found)
                 throw new UserNotFoundException();
             // Pravimo novo skladiste, prilikom kreiranja User-u koji ga je kreirao dodeljujemo sve privilegije
-            // TODO: Sve println nekako izbaciti
         } else {
-            System.out.println("Direktorijum nije skladiste. Da li zelite da kreirate novo skladiste? Unesite DA ili NE");
-            String choice = scanner.nextLine();
 
-            if(choice.equalsIgnoreCase("DA")){
-                System.out.println("Unesite username i password kako biste kreirali skladiste.");
-                System.out.println("Username:");
-                String username = scanner.nextLine();
-                System.out.println("Password:");
-                String password = scanner.nextLine();
-
-                User user = new User(username, password);
-                user.setPrivileges(Set.of(Privileges.values()));
-                StorageModel storageModel = new StorageModel(user, path);
-                this.storageModelList.add(storageModel);
-                setCurrentStorage(storageModel);
-            } else {
-                // TODO: videti sta ovde
-                System.out.println("Skladiste nije kreirano.");
-            }
+            user.setPrivileges(Set.of(Privileges.values()));
+            StorageModel storageModel = new StorageModel(user, path);
+            this.storageModelList.add(storageModel);
+            setCurrentStorage(storageModel);
         }
     }
 
