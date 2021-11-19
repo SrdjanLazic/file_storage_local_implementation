@@ -180,7 +180,6 @@ public class LocalFileStorageImplementation implements FileStorage {
         if(currentStorage.getCurrentUser() == null)
             throw new CurrentUserIsNullException();
 
-        System.out.println(currentStorage.getCurrentUser());
         // Provera privilegija:
         if(!currentStorage.getCurrentUser().getPrivileges().contains(Privileges.CREATE)){
             throw new InsufficientPrivilegesException();
@@ -486,7 +485,6 @@ public class LocalFileStorageImplementation implements FileStorage {
     }
 
 
-    // TODO: ne sme ispis!!!
     @Override
     public Collection<String> list(String path, String argument, Operations operation, boolean searchSubdirectories) throws InsufficientPrivilegesException, FileNotFoundException {
 
@@ -662,7 +660,7 @@ public class LocalFileStorageImplementation implements FileStorage {
 
         // Ako jeste skladiste, procitaj user i config fajlove
         if(isStorage){
-
+            System.out.println("\nPokusaj logovanja na postojece skladiste...");
             ObjectMapper objectMapper = new ObjectMapper();
             objectMapper.enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
             List<User> users = new ArrayList<>();
@@ -694,6 +692,7 @@ public class LocalFileStorageImplementation implements FileStorage {
             // Pravimo novo skladiste, prilikom kreiranja User-u koji ga je kreirao dodeljujemo sve privilegije
         } else {
 
+            System.out.println("\nKreira se novo skladiste....");
             user.setPrivileges(Set.of(Privileges.values()));
             StorageModel storageModel = new StorageModel(user, path);
             this.storageModelList.add(storageModel);
@@ -821,7 +820,7 @@ public class LocalFileStorageImplementation implements FileStorage {
         User findUser = null;
 
         if(!(currentStorage.getCurrentUser() == null))
-            throw new CurrentUserIsNullException();
+            throw new UserAlreadyLoggedInException();
 
         // Prodji kroz sve usere:
         for(User u: currentStorage.getUserList()){
@@ -840,7 +839,6 @@ public class LocalFileStorageImplementation implements FileStorage {
         currentStorage.updateUsers();
     }
 
-    // TODO: kod svih operacija sa skladistem uraditi proveru, ako je currentUser == null -> nijedan korisnik nije logovan, ne moze da se izvrsi
     @Override
     public void logout() throws UserNotFoundException, UserLogoutException{
 
@@ -886,6 +884,8 @@ public class LocalFileStorageImplementation implements FileStorage {
             privilegesToAdd.add((Privileges.VIEW));
 
         user.getFolderPrivileges().put(fullPath, privilegesToAdd);
+        currentStorage.updateUsers();
+        currentStorage.updateConfig();
     }
 
 
